@@ -1,8 +1,8 @@
-= Proposal for a tskit_multichrom library providing multiple-chromosome (contig) support for tskit =
+# Proposal for a tskit_multichrom library providing multiple-chromosome (contig) support for tskit
 
 **NOTE (March 2026):** This proposal has been substantially implemented. See the "IMPLEMENTATION STATUS SUMMARY" section at the end for a detailed breakdown of what is complete and what remains to be done.
 
-== Background: ==
+## Background
 
 See https://docs.google.com/document/d/1mjZEuxetIfja8WD4DIt5NQXxKNe2u-kw64vjPjiwLPw
 
@@ -16,9 +16,9 @@ Key points:
 * We want to support a mix of presence and absence of cross chromosomal phasing (e.g. if there are parent/child trios in a dataset, the children can be phased across chromosomes, but that may not be possible for the parents)
 * Stats with `sample_sets` parameter can work across all contigs, but only if the provided sample nodes are globally phased (i.e., correspond between chromosomes); in cases where all sample nodes are globally phased in all the chromosomes, the `sample_sets` parameter can be omitted and defaults to all global samples
 
-== Details ==
+## Details
 
-=== Strict specifications ===
+### Strict specifications
 
 1. We require individual tables to be identical within an archive
 2. We require population tables to be identical within an archive
@@ -31,7 +31,7 @@ Key points:
     * Nodes without the IS_SHARED flag are treated as specific to that local tree sequence (this includes nodes with the same ID as another IS_SHARED node on a different contig). This provides an alternative approach to the `is_vacant` bitfield flag in the SLiM representation.
 8. The top level metadata of each tree sequence must contain a 'contig' key in the same format as used by the `this_chromosome` field in SLiM, that specifies "index", "id", "symbol", and "type". "Id" and "index" are required to be non-negative integers, and unique across contigs. The order of contigs in the archive is determined by the order of the "index" values, but there is a looser specification for "index" in that the integers are not required to be consecutive (see "reindexing" below).
 
-=== Optional table specifications ===
+### Optional table specifications
 
 The following are optional but highly recommended (reasons explained below)
 
@@ -39,13 +39,13 @@ The following are optional but highly recommended (reasons explained below)
 10. (Currently) Top level metadata should be JSON format with a permissive schema. If not, then metadata will not be fully round-tripped (in particular, the original schema of each contig is not saved anywhere when converting to a single tree sequence)
 11. The node metadata schema should be compatible with storing the is_vacant metadata information used by SLiM. If not, data can be converted to a single tree sequence format, but it is not guaranteed to retain the same node IDs and sample flags when being converted back to archive format.
 
-=== Constraints ===
+### Constraints
 
 The tskit node ID is used to link all nodes that are shared. This has the major advantage that a single ID is valid both for each constituent tree sequence and for the total assemblage. The down side to this is that, as node IDs correspond to their order in the node tables, having a shared node ID of (say) 99 requires tree sequences sharing that node to have at least 100 nodes in total. We can minimise this problem by using low IDs for "shared nodes" (likely to be generally true, as shared nodes are most often samples, and samples often have IDs 0..N). If necessary we can also pad the node table with unused nodes. 
 
-== Basic functions ==
+## Basic functions
 
-=== Loading and caching: === 
+### Loading and caching
 
 ✅ **IMPLEMENTED**
 
@@ -61,19 +61,19 @@ Caching (also performed when creating a new archive via .subset)
 3. ✅ We also count the number of "nonglobal sample nodes": i.e. nodes that are samples but not shared (cross-phased) in one or more contigs. If there are any nonglobal sample nodes, we can't easily refer to a single sample set. An archive with any nonglobal sample nodes is called a nonglobal-sample ARG. (This term is specifically about sample nodes; nonsample nodes may be non-cross-phased in any case.)
 4. ✅ We cache (and index) contig metadata information so that it is easy to refer to the tree sequences corresponding to individual contigs, e.g. via `ta.contig("X")`
 
-=== Subsetting: ===
+### Subsetting
 
 ✅ **IMPLEMENTED**
 
 We should be able to create a new archive by subsetting. This allows us to create an object without any nonglobal sample nodes (for example, all the autosomes using `ta.subset(type="A")`). The subsetting can be done entirely in-memory, and should not require making a copy of the underlying tree sequences, so should be cheap. It should only require re-running the caching process (above).
 
-=== Reindexing: ===
+### Reindexing
 
 ✅ **IMPLEMENTED**
 
 Even if a set of tree sequences are indexed from 0..N, when subsetted those indexes may not remain consecutive integers. A slightly more expensive operation involves making a copy of the tree sequences and changing the indexes in their metadata to be from 0..N. We could also use a `reindex` function to reorder the contigs, by specifying a different index order.
 
-=== Conversion: ===
+### Conversion
 
 ✅ **MOSTLY IMPLEMENTED** — `to_ts()`, `from_ts()`, `from_slim()`, and `from_tree_sequences()` functions exist.
 
@@ -125,7 +125,7 @@ We enumerate through the top-level array getting `i` and the `num_nodes` for eac
 * The individual, population, and provenance tables should be automatically copied
 * The tricky thing is to know which nodes to keep. We need to make sure that all the nodes marked as IS_SHARED and which do not have an is_vacant bitflag for this chromosome in their metadata retain the same IDs in the final tree sequence. This can be done using .subset. Specifically, we make a boolean is_shared array of the same length as node_used, but full of zeros, and set True for those nodes marked as IS_SHARED and which do not have the is_vacant bitfield set (we warn if there is no is_vacant bitfield, and treat this as not being vacant). We logical_or the is_shared and node_used arrays, and take the indexes of the first num_nodes True values as the node IDs to pass to subset().
 
-=== Simplifying: ===
+### Simplifying
 
 ✅ **PARTIALLY IMPLEMENTED**
 
@@ -137,7 +137,7 @@ We enumerate through the top-level array getting `i` and the `num_nodes` for eac
 * ❌ other arguments to simplify not yet implemented (details to work out: some
 arguments may not be appropriate)
 
-== General API ==
+## General API
 
 ✅ **PARTIALLY IMPLEMENTED**
 
@@ -155,9 +155,9 @@ arguments may not be appropriate)
 
 ---
 
-== IMPLEMENTATION STATUS SUMMARY ==
+## IMPLEMENTATION STATUS SUMMARY
 
-=== Core Functionality (✅ Complete) ===
+### Core Functionality (✅ Complete)
 - ✅ TreesAssemblage class with validation
 - ✅ ContigKey namedtuple for organizing contigs
 - ✅ Loading and saving archives (load/dump)
@@ -168,33 +168,33 @@ arguments may not be appropriate)
 - ✅ Dictionary-like interface (keys(), values(), items(), __getitem__)
 - ✅ Contig access by id, symbol, or index
 
-=== Subsetting and Reindexing (✅ Complete) ===
+### Subsetting and Reindexing (✅ Complete)
 - ✅ Subset by symbols, type(s), ids, or indexes
 - ✅ Reindex to renumber from 0..N
 - ✅ Reorder contigs by specifying desired order
 
-=== Conversion Functions (✅ Complete) ===
+### Conversion Functions (✅ Complete)
 - ✅ ta.to_ts() — merge TreesAssemblage into single TreeSequence
 - ✅ from_ts() — split single TreeSequence into TreesAssemblage
 - ✅ from_slim() — convert SLiM-style tree sequences to TreesAssemblage
 - ✅ from_tree_sequences() — create assemblage from list of tree sequences
 
-=== Statistics (⚠️ Partial) ===
+### Statistics (⚠️ Partial)
 - ✅ Cross-contig stats with `sample_sets` parameter (requires globally phased nodes) — `diversity()` implemented
 - ❌ Windowing support for cross-contig stats (raises NotImplementedError)
 - ❌ Other cross-contig stats methods not yet implemented
 
-=== Simplification (✅ Complete) ===
+### Simplification (✅ Complete)
 - ✅ ta.simplify(samples=None, *, individuals=None)
 - ✅ Supports simplification of nonglobal-sample ARGs via `individuals=[...]`
 
-=== Missing/Incomplete Features (❌) ===
+### Missing/Incomplete Features (❌)
 - ❌ .variants() iterator
 - ❌ .trees() iterator
 - ❌ Windowed statistics
 - ❌ Recapitation/union support for multi-chromosome SLiM sequences
 
-=== Notes ===
+### Notes
 - All strict specifications (1-8) are enforced
 - Optional table specifications (9-11) are validated
 - The implementation has solid test coverage in the tests/ directory
