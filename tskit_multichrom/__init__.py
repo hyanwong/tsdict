@@ -2,7 +2,7 @@
 tskit_multichrom: A wrapper on top of tskit for storing and analysing
 multiple chromosomes (contigs).
 
-The central object is :class:`TreesArchive` (abbreviated ``ta``), which holds
+The central object is :class:`TreesAssemblage` (abbreviated ``ta``), which holds
 a collection of :class:`tskit.TreeSequence` objects — one per contig — stored
 in a dictionary keyed by :class:`ContigKey` namedtuples.
 
@@ -10,30 +10,37 @@ Quick start::
 
     import tskit_multichrom as tmc
 
-    # Load from a .tsa archive file
-    ta = tmc.load("genome.tsa")
+    # Load from a directory or zip archive
+    ta = tmc.load("genome_trees")
 
     # Access a contig by symbol
-    chr1_ts = ta.chr("chr1")
+    chr1_ts = ta.contig("chr1")
 
-    # Save back to file
-    tmc.dump(ta, "genome.tsa")
+    # Save back to a directory
+    tmc.dump(ta, "genome_trees")
 
     # Convert to a single tree sequence
-    ts = tmc.to_tree_sequence(ta)
+    ts = tmc.to_ts(ta)
 
     # Convert back
-    ta2 = tmc.from_tree_sequence(ts)
+    ta2 = tmc.from_ts(ts)
 """
 
-from .core import ContigKey, TreesArchive, make_contig_key, make_permissive_contig_schema
-from .convert import from_slim, from_tree_sequence, to_tree_sequence
+from .core import (
+    ContigKey,
+    TreesArchive,  # backwards-compatible alias
+    TreesAssemblage,
+    make_contig_key,
+    make_permissive_contig_schema,
+)
+from .convert import from_slim, from_tree_sequence, from_ts, to_tree_sequence, to_ts
 from .flags import ARCHIVE_EXTENSION, CONTIG_METADATA_KEY, NODE_IS_SHARED
 from .io import dump, load
 
 __all__ = [
     # Core
-    "TreesArchive",
+    "TreesAssemblage",
+    "TreesArchive",  # backwards-compatible alias
     "ContigKey",
     "make_contig_key",
     "make_permissive_contig_schema",
@@ -41,8 +48,10 @@ __all__ = [
     "load",
     "dump",
     # Conversion
-    "to_tree_sequence",
-    "from_tree_sequence",
+    "to_ts",
+    "from_ts",
+    "to_tree_sequence",    # backwards-compatible alias
+    "from_tree_sequence",  # backwards-compatible alias
     "from_slim",
     # Flags
     "NODE_IS_SHARED",

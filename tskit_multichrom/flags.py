@@ -7,8 +7,9 @@ Flag constants for tskit_multichrom.
 # We use bit 20 to avoid conflicts with tskit (bit 0) and SLiM (bits 16–19).
 NODE_IS_SHARED = 1 << 20
 
-# File extension for a trees archive (zip of .trees files)
-ARCHIVE_EXTENSION = ".tsa"
+# Default file suffix for an uncompressed trees archive zip file.
+# A trees archive can also be a directory ending in ``_trees``.
+ARCHIVE_EXTENSION = "_trees.zip"
 
 # Name of the metadata key holding contig information in each tree sequence
 CONTIG_METADATA_KEY = "contig"

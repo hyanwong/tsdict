@@ -1,16 +1,14 @@
 """
-Core TreesArchive class for tskit_multichrom.
+Core TreesAssemblage class for tskit_multichrom.
 """
 
 import collections
-import warnings
 
-import numpy as np
 import tskit
 
 from .flags import CONTIG_METADATA_KEY, NODE_IS_SHARED
 
-# Named tuple representing a contig's key in the archive dictionary.
+# Named tuple representing a contig's key in the assemblage dictionary.
 # - index: ordering integer (not required to be consecutive)
 # - id: unique integer identifier
 # - symbol: string identifier (e.g. "chrX")
@@ -18,15 +16,15 @@ from .flags import CONTIG_METADATA_KEY, NODE_IS_SHARED
 ContigKey = collections.namedtuple("ContigKey", ["index", "id", "symbol", "type"])
 
 
-class TreesArchive:
+class TreesAssemblage:
     """
     A collection of tree sequences representing multiple contigs (chromosomes).
 
     Each tree sequence is stored under a :class:`ContigKey` namedtuple.
-    The archive enforces a set of consistency requirements across the
+    The assemblage enforces a set of consistency requirements across the
     constituent tree sequences (see :meth:`_validate`).
 
-    Access contigs via :meth:`chr` (by symbol) or :meth:`contig` (by index or id).
+    Access contigs via :meth:`contig` (by id, symbol, or index).
 
     Parameters
     ----------
@@ -69,11 +67,13 @@ class TreesArchive:
         symbols = [k.symbol for k in keys]
 
         if len(set(indexes)) != len(indexes):
-            raise ValueError("Contig 'index' values must be unique within an archive")
+            raise ValueError("Contig 'index' values must be unique within an assemblage")
         if len(set(ids)) != len(ids):
-            raise ValueError("Contig 'id' values must be unique within an archive")
+            raise ValueError("Contig 'id' values must be unique within an assemblage")
         if len(set(symbols)) != len(symbols):
-            raise ValueError("Contig 'symbol' values must be unique within an archive")
+            raise ValueError(
+                "Contig 'symbol' values must be unique within an assemblage"
+            )
         for k in keys:
             if not isinstance(k.index, int) or k.index < 0:
                 raise ValueError(
@@ -95,14 +95,16 @@ class TreesArchive:
         for ts in tss[1:]:
             if not ref_ts.tables.individuals.equals(ts.tables.individuals):
                 raise ValueError(
-                    "Individual tables must be identical across all contigs in an archive"
+                    "Individual tables must be identical across all contigs in an "
+                    "assemblage"
                 )
 
         # Population tables must be identical
         for ts in tss[1:]:
             if not ref_ts.tables.populations.equals(ts.tables.populations):
                 raise ValueError(
-                    "Population tables must be identical across all contigs in an archive"
+                    "Population tables must be identical across all contigs in an "
+                    "assemblage"
                 )
 
         # Migration tables must be empty
@@ -118,7 +120,7 @@ class TreesArchive:
         for ts in tss[1:]:
             if ts.time_units != ref_time_units:
                 raise ValueError(
-                    "time_units must be identical across all contigs in an archive"
+                    "time_units must be identical across all contigs in an assemblage"
                 )
 
         # Node metadata schemas must be identical
@@ -204,7 +206,7 @@ class TreesArchive:
     # ------------------------------------------------------------------
 
     def _build_cache(self):
-        """Build the internal cache for the archive."""
+        """Build the internal cache for the assemblage."""
         self._cache = {}
 
         # Sort keys by index
@@ -302,54 +304,46 @@ class TreesArchive:
 
     @property
     def num_contigs(self):
-        """int: Number of contigs in the archive."""
+        """int: Number of contigs in the assemblage."""
         return len(self._tree_sequences)
 
     # ------------------------------------------------------------------
     # Contig access
     # ------------------------------------------------------------------
 
-    def chr(self, symbol):
+    def contig(self, id_or_symbol):
         """
-        Return the tree sequence for the contig with the given symbol.
+        Return the tree sequence for a contig by its symbol (str), integer id,
+        or integer index.
+
+        If a string is provided, it is treated as the contig symbol (e.g.
+        ``"chrX"``). If an integer is provided it is first matched against the
+        contig ``id`` field, and then against the contig ``index`` field.
 
         Parameters
         ----------
-        symbol : str
-            The symbol (e.g. "chrX", "1") of the contig.
+        id_or_symbol : str or int
 
         Returns
         -------
         tskit.TreeSequence
         """
-        if symbol not in self._by_symbol:
-            raise KeyError(
-                f"No contig with symbol {symbol!r}. "
-                f"Available: {list(self._by_symbol)}"
-            )
-        return self._tree_sequences[self._by_symbol[symbol]]
+        if isinstance(id_or_symbol, str):
+            if id_or_symbol not in self._by_symbol:
+                raise KeyError(
+                    f"No contig with symbol {id_or_symbol!r}. "
+                    f"Available: {list(self._by_symbol)}"
+                )
+            return self._tree_sequences[self._by_symbol[id_or_symbol]]
 
-    def contig(self, id_or_index):
-        """
-        Return the tree sequence for a contig by its integer id or index.
-
-        Parameters
-        ----------
-        id_or_index : int
-            The 'id' of the contig (preferred). Falls back to 'index' if not found.
-
-        Returns
-        -------
-        tskit.TreeSequence
-        """
-        if id_or_index in self._by_id:
-            return self._tree_sequences[self._by_id[id_or_index]]
-        # Fall back to lookup by index
+        # Integer lookup: try id first, then index
+        if id_or_symbol in self._by_id:
+            return self._tree_sequences[self._by_id[id_or_symbol]]
         for key in self._tree_sequences:
-            if key.index == id_or_index:
+            if key.index == id_or_symbol:
                 return self._tree_sequences[key]
         raise KeyError(
-            f"No contig with id or index {id_or_index!r}. "
+            f"No contig with id or index {id_or_symbol!r}. "
             f"Available ids: {list(self._by_id)}"
         )
 
@@ -367,7 +361,7 @@ class TreesArchive:
     def __repr__(self):
         symbols = [k.symbol for k in self._sorted_keys]
         return (
-            f"TreesArchive(contigs={symbols!r}, "
+            f"TreesAssemblage(contigs={symbols!r}, "
             f"total_length={self.total_sequence_length})"
         )
 
@@ -375,9 +369,9 @@ class TreesArchive:
     # Subsetting
     # ------------------------------------------------------------------
 
-    def subset(self, *, symbols=None, types=None, ids=None, indexes=None):
+    def subset(self, *, symbols=None, type=None, types=None, ids=None, indexes=None):
         """
-        Create a new :class:`TreesArchive` from a subset of contigs.
+        Create a new :class:`TreesAssemblage` from a subset of contigs.
 
         Subsetting is cheap: it does not copy the underlying tree sequences.
         Only the cache is recomputed.
@@ -386,8 +380,11 @@ class TreesArchive:
         ----------
         symbols : list[str], optional
             Keep only contigs with these symbols.
+        type : str, optional
+            Keep only contigs whose type matches this single string value.
         types : list[str], optional
             Keep only contigs with these types (e.g. ``["A"]`` for autosomes).
+            If both ``type`` and ``types`` are given, they are combined.
         ids : list[int], optional
             Keep only contigs with these id values.
         indexes : list[int], optional
@@ -395,16 +392,23 @@ class TreesArchive:
 
         Returns
         -------
-        TreesArchive
+        TreesAssemblage
         """
         keep = set(self._tree_sequences.keys())
 
         if symbols is not None:
             symbols_set = set(symbols)
             keep &= {k for k in keep if k.symbol in symbols_set}
+
+        # Merge `type` (single) and `types` (list) into one filter
+        types_filter = None
+        if type is not None:
+            types_filter = {type}
         if types is not None:
-            types_set = set(types)
-            keep &= {k for k in keep if k.type in types_set}
+            types_filter = (types_filter or set()) | set(types)
+        if types_filter is not None:
+            keep &= {k for k in keep if k.type in types_filter}
+
         if ids is not None:
             ids_set = set(ids)
             keep &= {k for k in keep if k.id in ids_set}
@@ -413,7 +417,7 @@ class TreesArchive:
             keep &= {k for k in keep if k.index in indexes_set}
 
         new_ts = {k: self._tree_sequences[k] for k in keep}
-        return TreesArchive(new_ts, skip_validation=True)
+        return TreesAssemblage(new_ts, skip_validation=True)
 
     # ------------------------------------------------------------------
     # Reindexing
@@ -421,7 +425,7 @@ class TreesArchive:
 
     def reindex(self, order=None):
         """
-        Return a new :class:`TreesArchive` with contigs reindexed from 0..N-1.
+        Return a new :class:`TreesAssemblage` with contigs reindexed from 0..N-1.
 
         This makes copies of the underlying tree sequences with updated metadata.
 
@@ -433,7 +437,7 @@ class TreesArchive:
 
         Returns
         -------
-        TreesArchive
+        TreesAssemblage
         """
         if order is None:
             ordered_keys = self._sorted_keys
@@ -474,7 +478,11 @@ class TreesArchive:
             )
             new_ts[new_key] = tables.tree_sequence()
 
-        return TreesArchive(new_ts)
+        return TreesAssemblage(new_ts)
+
+
+# Backwards-compatible alias
+TreesArchive = TreesAssemblage
 
 
 # ------------------------------------------------------------------
@@ -516,25 +524,13 @@ def make_contig_key(contig_meta):
 
 def make_permissive_contig_schema():
     """
-    Return a :class:`tskit.MetadataSchema` suitable for contig top-level metadata.
+    Return a permissive :class:`tskit.MetadataSchema` suitable for contig
+    top-level metadata.
 
-    The schema is permissive JSON with a required 'contig' key.
+    Uses :meth:`tskit.MetadataSchema.permissive_json` as the base schema so
+    that any additional top-level keys are tolerated. The presence of the
+    required ``'contig'`` key is validated separately when a
+    :class:`TreesAssemblage` is constructed (see
+    :meth:`TreesAssemblage._check_contig_metadata`).
     """
-    schema_dict = {
-        "codec": "json",
-        "type": "object",
-        "properties": {
-            CONTIG_METADATA_KEY: {
-                "type": "object",
-                "properties": {
-                    "index": {"type": "integer"},
-                    "id": {"type": "integer"},
-                    "symbol": {"type": "string"},
-                    "type": {"type": "string"},
-                },
-                "required": ["index", "id", "symbol", "type"],
-            }
-        },
-        "additionalProperties": True,
-    }
-    return tskit.MetadataSchema(schema_dict)
+    return tskit.MetadataSchema.permissive_json()

@@ -80,7 +80,7 @@ def make_ts(
 
 
 def make_two_contig_archive(mark_shared=True, num_samples=4):
-    """Return a TreesArchive with two autosomes."""
+    """Return a TreesAssemblage with two autosomes."""
     ts1 = make_ts(
         seq_len=1000,
         num_samples=num_samples,
@@ -93,7 +93,7 @@ def make_two_contig_archive(mark_shared=True, num_samples=4):
         contig_meta={"index": 1, "id": 1, "symbol": "chr2", "type": "A"},
         mark_shared=mark_shared,
     )
-    return tmc.TreesArchive(
+    return tmc.TreesAssemblage(
         {
             tmc.ContigKey(0, 0, "chr1", "A"): ts1,
             tmc.ContigKey(1, 1, "chr2", "A"): ts2,

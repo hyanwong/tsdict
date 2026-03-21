@@ -1,5 +1,5 @@
 """
-Tests for the TreesArchive core class.
+Tests for the TreesAssemblage core class.
 """
 
 import pytest
@@ -25,27 +25,27 @@ class TestContigKey:
         assert key[3] == "A"
 
 
-class TestTreesArchiveConstruction:
+class TestTreesAssemblageConstruction:
     def test_basic(self):
         ta = make_two_contig_archive()
         assert ta.num_contigs == 2
 
     def test_empty(self):
-        ta = tmc.TreesArchive({})
+        ta = tmc.TreesAssemblage({})
         assert ta.num_contigs == 0
 
     def test_wrong_key_type(self):
         ts = make_ts(contig_meta={"index": 0, "id": 0, "symbol": "c1", "type": "A"})
         with pytest.raises(TypeError, match="ContigKey"):
-            tmc.TreesArchive({"bad_key": ts})
+            tmc.TreesAssemblage({"bad_key": ts})
 
     def test_wrong_value_type(self):
         with pytest.raises(TypeError, match="tskit.TreeSequence"):
-            tmc.TreesArchive({tmc.ContigKey(0, 0, "c1", "A"): "not a ts"})
+            tmc.TreesAssemblage({tmc.ContigKey(0, 0, "c1", "A"): "not a ts"})
 
     def test_non_dict(self):
         with pytest.raises(TypeError, match="dict"):
-            tmc.TreesArchive([])
+            tmc.TreesAssemblage([])
 
 
 class TestValidation:
@@ -53,7 +53,7 @@ class TestValidation:
         ts1 = make_ts(contig_meta={"index": 0, "id": 0, "symbol": "c1", "type": "A"})
         ts2 = make_ts(contig_meta={"index": 0, "id": 1, "symbol": "c2", "type": "A"})
         with pytest.raises(ValueError, match="index"):
-            tmc.TreesArchive(
+            tmc.TreesAssemblage(
                 {
                     tmc.ContigKey(0, 0, "c1", "A"): ts1,
                     tmc.ContigKey(0, 1, "c2", "A"): ts2,
@@ -64,7 +64,7 @@ class TestValidation:
         ts1 = make_ts(contig_meta={"index": 0, "id": 0, "symbol": "c1", "type": "A"})
         ts2 = make_ts(contig_meta={"index": 1, "id": 0, "symbol": "c2", "type": "A"})
         with pytest.raises(ValueError, match="id"):
-            tmc.TreesArchive(
+            tmc.TreesAssemblage(
                 {
                     tmc.ContigKey(0, 0, "c1", "A"): ts1,
                     tmc.ContigKey(1, 0, "c2", "A"): ts2,
@@ -75,7 +75,7 @@ class TestValidation:
         ts1 = make_ts(contig_meta={"index": 0, "id": 0, "symbol": "c1", "type": "A"})
         ts2 = make_ts(contig_meta={"index": 1, "id": 1, "symbol": "c1", "type": "A"})
         with pytest.raises(ValueError, match="symbol"):
-            tmc.TreesArchive(
+            tmc.TreesAssemblage(
                 {
                     tmc.ContigKey(0, 0, "c1", "A"): ts1,
                     tmc.ContigKey(1, 1, "c1", "A"): ts2,
@@ -85,7 +85,7 @@ class TestValidation:
     def test_missing_contig_metadata(self):
         ts_no_meta = make_ts(contig_meta=None)  # no metadata at all
         with pytest.raises(ValueError, match="contig"):
-            tmc.TreesArchive({tmc.ContigKey(0, 0, "c1", "A"): ts_no_meta})
+            tmc.TreesAssemblage({tmc.ContigKey(0, 0, "c1", "A"): ts_no_meta})
 
     def test_individual_tables_mismatch(self):
         ts1 = make_ts(
@@ -97,7 +97,7 @@ class TestValidation:
             contig_meta={"index": 1, "id": 1, "symbol": "c2", "type": "A"},
         )
         with pytest.raises(ValueError, match="Individual"):
-            tmc.TreesArchive(
+            tmc.TreesAssemblage(
                 {
                     tmc.ContigKey(0, 0, "c1", "A"): ts1,
                     tmc.ContigKey(1, 1, "c2", "A"): ts2,
@@ -114,7 +114,7 @@ class TestValidation:
         tables.metadata = {"contig": {"index": 1, "id": 1, "symbol": "c2", "type": "A"}}
         ts2 = tables.tree_sequence()
         with pytest.raises(ValueError, match="Population"):
-            tmc.TreesArchive(
+            tmc.TreesAssemblage(
                 {
                     tmc.ContigKey(0, 0, "c1", "A"): ts1,
                     tmc.ContigKey(1, 1, "c2", "A"): ts2,
@@ -131,7 +131,7 @@ class TestValidation:
         )
         ts_with_mig = tables.tree_sequence()
         with pytest.raises(ValueError, match="[Mm]igration"):
-            tmc.TreesArchive({tmc.ContigKey(0, 0, "c1", "A"): ts_with_mig})
+            tmc.TreesAssemblage({tmc.ContigKey(0, 0, "c1", "A"): ts_with_mig})
 
 
 class TestCaching:
@@ -163,15 +163,15 @@ class TestCaching:
 
 
 class TestAccess:
-    def test_chr_access(self):
+    def test_contig_by_symbol(self):
         ta = make_two_contig_archive()
-        ts = ta.chr("chr1")
+        ts = ta.contig("chr1")
         assert ts.sequence_length == 1000
 
-    def test_chr_unknown(self):
+    def test_contig_symbol_unknown(self):
         ta = make_two_contig_archive()
         with pytest.raises(KeyError, match="chr99"):
-            ta.chr("chr99")
+            ta.contig("chr99")
 
     def test_contig_by_id(self):
         ta = make_two_contig_archive()
@@ -210,7 +210,7 @@ class TestSubset:
         ta = make_two_contig_archive()
         sub = ta.subset(symbols=["chr1"])
         assert sub.num_contigs == 1
-        assert sub.chr("chr1").sequence_length == 1000
+        assert sub.contig("chr1").sequence_length == 1000
 
     def test_subset_by_type(self):
         # Create an archive with different types
@@ -222,7 +222,7 @@ class TestSubset:
             seq_len=500,
             contig_meta={"index": 1, "id": 1, "symbol": "chrX", "type": "X"},
         )
-        ta = tmc.TreesArchive(
+        ta = tmc.TreesAssemblage(
             {
                 tmc.ContigKey(0, 0, "chr1", "A"): ts1,
                 tmc.ContigKey(1, 1, "chrX", "X"): ts2,
@@ -230,7 +230,27 @@ class TestSubset:
         )
         sub = ta.subset(types=["A"])
         assert sub.num_contigs == 1
-        assert sub.chr("chr1")
+        assert sub.contig("chr1")
+
+    def test_subset_by_single_type(self):
+        """subset(type=...) should work as a convenient single-value filter."""
+        ts1 = make_ts(
+            seq_len=1000,
+            contig_meta={"index": 0, "id": 0, "symbol": "chr1", "type": "A"},
+        )
+        ts2 = make_ts(
+            seq_len=500,
+            contig_meta={"index": 1, "id": 1, "symbol": "chrX", "type": "X"},
+        )
+        ta = tmc.TreesAssemblage(
+            {
+                tmc.ContigKey(0, 0, "chr1", "A"): ts1,
+                tmc.ContigKey(1, 1, "chrX", "X"): ts2,
+            }
+        )
+        sub = ta.subset(type="A")
+        assert sub.num_contigs == 1
+        assert sub.contig("chr1")
 
     def test_subset_empty_result(self):
         ta = make_two_contig_archive()
@@ -263,7 +283,7 @@ class TestReindex:
     def test_reindex_updates_metadata(self):
         ta = make_two_contig_archive()
         ta2 = ta.reindex(order=["chr2", "chr1"])
-        meta0 = ta2.chr("chr2").metadata["contig"]
+        meta0 = ta2.contig("chr2").metadata["contig"]
         assert meta0["index"] == 0
-        meta1 = ta2.chr("chr1").metadata["contig"]
+        meta1 = ta2.contig("chr1").metadata["contig"]
         assert meta1["index"] == 1

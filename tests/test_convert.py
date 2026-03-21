@@ -1,5 +1,5 @@
 """
-Tests for conversion between TreesArchive and a single TreeSequence.
+Tests for conversion between TreesAssemblage and a single TreeSequence.
 """
 
 import pytest
@@ -12,18 +12,18 @@ from tests.conftest import make_ts, make_two_contig_archive
 class TestToTreeSequence:
     def test_basic(self):
         ta = make_two_contig_archive()
-        ts = tmc.to_tree_sequence(ta)
+        ts = tmc.to_ts(ta)
         assert isinstance(ts, tskit.TreeSequence)
         assert ts.sequence_length == ta.total_sequence_length
 
     def test_metadata_present(self):
         ta = make_two_contig_archive()
-        ts = tmc.to_tree_sequence(ta)
+        ts = tmc.to_ts(ta)
         assert "tskit_multichrom_contigs" in ts.metadata
 
     def test_contigs_in_metadata(self):
         ta = make_two_contig_archive()
-        ts = tmc.to_tree_sequence(ta)
+        ts = tmc.to_ts(ta)
         meta = ts.metadata["tskit_multichrom_contigs"]
         assert len(meta) == 2
         symbols = [c["contig"]["symbol"] for c in meta]
@@ -31,9 +31,9 @@ class TestToTreeSequence:
         assert "chr2" in symbols
 
     def test_empty_raises(self):
-        ta = tmc.TreesArchive({})
+        ta = tmc.TreesAssemblage({})
         with pytest.raises(ValueError, match="empty"):
-            tmc.to_tree_sequence(ta)
+            tmc.to_ts(ta)
 
     def test_site_schema_mismatch_raises(self):
         ts1 = make_ts(
@@ -50,19 +50,19 @@ class TestToTreeSequence:
             {"codec": "json", "type": "object", "properties": {"x": {"type": "integer"}}}
         )
         ts2_mod = tables.tree_sequence()
-        ta = tmc.TreesArchive(
+        ta = tmc.TreesAssemblage(
             {
                 tmc.ContigKey(0, 0, "c1", "A"): ts1,
                 tmc.ContigKey(1, 1, "c2", "A"): ts2_mod,
             }
         )
         with pytest.raises(ValueError, match="[Ss]ite"):
-            tmc.to_tree_sequence(ta)
+            tmc.to_ts(ta)
 
     def test_shared_nodes_have_same_id(self):
         """Shared nodes should retain their IDs in the merged tree sequence."""
         ta = make_two_contig_archive(mark_shared=True)
-        ts = tmc.to_tree_sequence(ta)
+        ts = tmc.to_ts(ta)
 
         # Nodes 0..4 (4 samples + 1 ancestral) should all have IS_SHARED set
         for node_id in range(5):
@@ -71,7 +71,7 @@ class TestToTreeSequence:
 
     def test_sequence_length(self):
         ta = make_two_contig_archive()
-        ts = tmc.to_tree_sequence(ta)
+        ts = tmc.to_ts(ta)
         assert ts.sequence_length == 3000  # 1000 + 2000
 
     def test_sites_are_shifted(self):
@@ -93,13 +93,13 @@ class TestToTreeSequence:
         tables2.sites.add_row(position=500.0, ancestral_state="T")
         ts2 = tables2.tree_sequence()
 
-        ta = tmc.TreesArchive(
+        ta = tmc.TreesAssemblage(
             {
                 tmc.ContigKey(0, 0, "chr1", "A"): ts1,
                 tmc.ContigKey(1, 1, "chr2", "A"): ts2,
             }
         )
-        merged = tmc.to_tree_sequence(ta)
+        merged = tmc.to_ts(ta)
         positions = list(merged.tables.sites.position)
         assert 500.0 in positions  # from chr1
         assert 1500.0 in positions  # from chr2 (500 + 1000)
@@ -108,22 +108,22 @@ class TestToTreeSequence:
 class TestFromTreeSequence:
     def test_roundtrip(self):
         ta = make_two_contig_archive()
-        ts = tmc.to_tree_sequence(ta)
-        ta2 = tmc.from_tree_sequence(ts)
+        ts = tmc.to_ts(ta)
+        ta2 = tmc.from_ts(ts)
         assert ta2.num_contigs == 2
 
     def test_roundtrip_sequence_lengths(self):
         ta = make_two_contig_archive()
-        ts = tmc.to_tree_sequence(ta)
-        ta2 = tmc.from_tree_sequence(ts)
-        assert ta2.chr("chr1").sequence_length == 1000
-        assert ta2.chr("chr2").sequence_length == 2000
+        ts = tmc.to_ts(ta)
+        ta2 = tmc.from_ts(ts)
+        assert ta2.contig("chr1").sequence_length == 1000
+        assert ta2.contig("chr2").sequence_length == 2000
 
     def test_roundtrip_contig_metadata(self):
         ta = make_two_contig_archive()
-        ts = tmc.to_tree_sequence(ta)
-        ta2 = tmc.from_tree_sequence(ts)
-        meta = ta2.chr("chr1").metadata[tmc.CONTIG_METADATA_KEY]
+        ts = tmc.to_ts(ta)
+        ta2 = tmc.from_ts(ts)
+        meta = ta2.contig("chr1").metadata[tmc.CONTIG_METADATA_KEY]
         assert meta["symbol"] == "chr1"
         assert meta["index"] == 0
 
@@ -135,7 +135,7 @@ class TestFromTreeSequence:
         tables.metadata = {}
         ts = tables.tree_sequence()
         with pytest.raises(ValueError, match="tskit_multichrom_contigs"):
-            tmc.from_tree_sequence(ts)
+            tmc.from_ts(ts)
 
 
 class TestFromSlim:
@@ -185,20 +185,20 @@ class TestFromSlim:
         ts2 = self._make_slim_ts(1, 1, "chr2", "A", 2000)
         ta = tmc.from_slim([ts1, ts2])
         assert ta.num_contigs == 2
-        assert ta.chr("chr1").sequence_length == 1000
-        assert ta.chr("chr2").sequence_length == 2000
+        assert ta.contig("chr1").sequence_length == 1000
+        assert ta.contig("chr2").sequence_length == 2000
 
     def test_nodes_marked_shared(self):
         ts1 = self._make_slim_ts(0, 0, "chr1", "A", 1000)
         ta = tmc.from_slim([ts1])
-        ts = ta.chr("chr1")
+        ts = ta.contig("chr1")
         for nid in range(ts.num_nodes):
             assert ts.tables.nodes[nid].flags & tmc.NODE_IS_SHARED
 
     def test_contig_metadata_added(self):
         ts1 = self._make_slim_ts(0, 0, "chr1", "A", 1000)
         ta = tmc.from_slim([ts1])
-        meta = ta.chr("chr1").metadata
+        meta = ta.contig("chr1").metadata
         assert tmc.CONTIG_METADATA_KEY in meta
         assert meta[tmc.CONTIG_METADATA_KEY]["symbol"] == "chr1"
 
