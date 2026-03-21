@@ -8,7 +8,7 @@ import pytest
 import tskit
 
 import tskit_multichrom as tmc
-from tests.conftest import make_ts, make_two_contig_archive
+from tests.conftest import make_autosomes_plus_x_archive, make_ts, make_two_contig_archive
 
 
 class TestToTreeSequence:
@@ -124,6 +124,31 @@ class TestToTreeSequence:
         assert 500.0 in positions  # from chr1
         assert 1500.0 in positions  # from chr2 (500 + 1000)
 
+    def test_is_vacant_bits_encoded_for_mixed_sample_sets(self):
+        """Verify is_vacant bits are set when contigs have different sample sets."""
+        ta = make_autosomes_plus_x_archive()
+
+        # autosome_only_samples: shared nodes present on chr1/chr2 but not chrX
+        auto_samples = set(ta.contig("chr1").samples())
+        x_samples = set(ta.contig("chrX").samples())
+        autosome_only_samples = auto_samples - x_samples
+        assert len(autosome_only_samples) > 0
+
+        # Merge and verify is_vacant bits are set for missing chrX
+        merged = tmc.to_ts(ta)
+        x_index = 2  # chrX index in make_autosomes_plus_x_archive
+
+        for nid in autosome_only_samples:
+            node_meta = merged.tables.nodes[int(nid)].metadata
+            assert "is_vacant" in node_meta, (
+                f"Node {nid} should have is_vacant metadata; "
+                f"got metadata: {node_meta}"
+            )
+            assert node_meta["is_vacant"] & (1 << x_index), (
+                f"Node {nid} should have is_vacant bit set for chrX (index {x_index}); "
+                f"got is_vacant: {node_meta['is_vacant']:032b}"
+            )
+
 
 class TestFromTreeSequence:
     def test_roundtrip(self):
@@ -184,6 +209,26 @@ class TestFromTreeSequence:
         ts = tables.tree_sequence()
         with pytest.raises(ValueError, match="contigs"):
             tmc.from_ts(ts)
+
+    def test_roundtrip_is_vacant_bits_reconstruct_samples(self):
+        """Verify is_vacant bits properly reconstruct sample markings in roundtrip."""
+        # Create A/A/X archive with different sample sets per chromosome type
+        ta = make_autosomes_plus_x_archive()
+
+        # Record original sample sets per contig
+        orig_samples = {key: set(ta[key].samples()) for key in ta.contigs}
+
+        # Roundtrip: to_ts encodes is_vacant bits, from_ts should decode them
+        merged = tmc.to_ts(ta)
+        reconstructed = tmc.from_ts(merged)
+
+        # Verify sample markings are correctly restored
+        for key in ta.contigs:
+            recon_samples = set(reconstructed[key].samples())
+            assert recon_samples == orig_samples[key], (
+                f"Sample markings differ for {key.symbol}: "
+                f"orig={orig_samples[key]}, recon={recon_samples}"
+            )
 
 
 class TestFromSlim:

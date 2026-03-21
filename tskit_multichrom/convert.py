@@ -372,19 +372,21 @@ def from_ts(ts, record_provenance=True):
         left = cumsum[i]
         right = cumsum[i + 1]
 
-        # Determine which nodes to keep for this contig
-        # Start with all nodes that have been used so far + IS_SHARED (not vacant)
+        # Determine which nodes to keep for this contig:
+        # - non-shared nodes that have been used so far (sequentially assigned)
+        # - shared nodes that are non-vacant for this contig
         is_shared_for_contig = _get_shared_for_contig(
             ts, is_shared_global, contig_meta_dict.get("index", i)
         )
-        candidate = node_used | is_shared_for_contig
+        non_shared_used = node_used & ~is_shared_global
+        candidate = non_shared_used | is_shared_for_contig
         # Take the first n_nodes True values as node IDs
         candidate_ids = np.where(candidate)[0]
         if len(candidate_ids) < n_nodes:
-            # Need more nodes — take next available
+            # Need more nodes — take next available non-shared nodes
             all_ids = np.arange(ts.num_nodes)
-            not_used = ~candidate
-            extra = all_ids[not_used][: n_nodes - len(candidate_ids)]
+            not_yet_assigned = ~node_used & ~is_shared_global
+            extra = all_ids[not_yet_assigned][: n_nodes - len(candidate_ids)]
             candidate_ids = np.sort(np.concatenate([candidate_ids, extra]))
         else:
             candidate_ids = candidate_ids[:n_nodes]
@@ -688,33 +690,20 @@ def _get_shared_for_contig(ts, is_shared_global, contig_index):
     """
     Return a boolean array indicating which nodes are IS_SHARED and
     non-vacant for the given contig.
+    
+    Checks the is_vacant bitfield in node metadata to determine if
+    a shared node is present (non-vacant) in this contig.
     """
-    # Try to read is_vacant from node metadata
-    # is_vacant is a bitfield where bit i means vacant in contig i
     result = is_shared_global.copy()
-    node_schema = ts.tables.nodes.metadata_schema.schema
-
-    has_vacant = (
-        node_schema
-        and node_schema.get("codec") == "json"
-        and "is_vacant" in node_schema.get("properties", {})
-    )
-
-    if has_vacant:
-        for nid in np.where(is_shared_global)[0]:
-            node_meta = ts.tables.nodes[int(nid)].metadata
-            if isinstance(node_meta, dict):
-                vacant_bits = node_meta.get("is_vacant", 0)
-                if vacant_bits & (1 << contig_index):
-                    result[nid] = False
-    else:
-        if np.any(is_shared_global):
-            warnings.warn(
-                "Node metadata does not have 'is_vacant' field; "
-                "treating all IS_SHARED nodes as non-vacant for all contigs.",
-                stacklevel=3,
-            )
-
+    
+    # For each shared node, check if it's vacant in this contig
+    for nid in np.where(is_shared_global)[0]:
+        node_meta = ts.tables.nodes[int(nid)].metadata
+        if isinstance(node_meta, dict):
+            vacant_bits = node_meta.get("is_vacant", 0)
+            if vacant_bits & (1 << contig_index):
+                result[nid] = False
+    
     return result
 
 
@@ -737,6 +726,11 @@ def _try_add_vacant_flags(metadata_bytes, vacant_bitflags, schema):
 
     # Decode, add field, re-encode
     try:
+        if isinstance(metadata_bytes, dict):
+            meta = dict(metadata_bytes)
+            meta["is_vacant"] = int(vacant_bitflags)
+            return meta
+
         if metadata_bytes:
             meta = schema.decode_row(metadata_bytes)
         else:
