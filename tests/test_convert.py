@@ -264,3 +264,215 @@ class TestFromSlim:
         ts = tables.tree_sequence()
         with pytest.raises(ValueError, match="this_chromosome"):
             tmc.from_slim([ts])
+
+
+class TestFromTreeSequences:
+    def test_basic(self):
+        """Test basic construction with default shared_nodes=None."""
+        ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
+        ts2 = make_ts(seq_len=2000, num_samples=4, mark_shared=False)
+        ta = tmc.from_tree_sequences(
+            [ts1, ts2],
+            ids=[20, 21],
+            symbols=["20", "21"],
+            types=["A", "A"],
+        )
+        assert ta.num_contigs == 2
+        assert ta.contig("20").sequence_length == 1000
+        assert ta.contig("21").sequence_length == 2000
+
+    def test_default_shared_nodes_none(self):
+        """Test that the default shared_nodes=None marks no nodes as IS_SHARED."""
+        ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
+        ta = tmc.from_tree_sequences(
+            [ts1],
+            ids=[1],
+            symbols=["chr1"],
+            types=["A"],
+        )
+        ts = ta.contig("chr1")
+        # Verify that no nodes have IS_SHARED marked
+        for nid in range(ts.num_nodes):
+            assert not (ts.tables.nodes[nid].flags & tmc.NODE_IS_SHARED)
+
+    def test_contig_keys_created(self):
+        """Test that ContigKey objects are created with correct values."""
+        ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
+        ts2 = make_ts(seq_len=2000, num_samples=4, mark_shared=False)
+        ta = tmc.from_tree_sequences(
+            [ts1, ts2],
+            ids=[20, 21],
+            symbols=["chr20", "chr21"],
+            types=["A", "A"],
+            indexes=[10, 11],
+            shared_nodes="samples",
+        )
+        key1 = tmc.ContigKey(index=10, id=20, symbol="chr20", type="A")
+        key2 = tmc.ContigKey(index=11, id=21, symbol="chr21", type="A")
+        assert key1 in ta
+        assert key2 in ta
+
+    def test_sample_nodes_marked_shared(self):
+        """Test that sample nodes are marked as IS_SHARED when shared_nodes='samples'."""
+        ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
+        ta = tmc.from_tree_sequences(
+            [ts1],
+            ids=[1],
+            symbols=["chr1"],
+            types=["A"],
+            shared_nodes="samples",
+        )
+        ts = ta.contig("chr1")
+        sample_ids = ts.samples()
+        for sample_id in sample_ids:
+            assert ts.tables.nodes[sample_id].flags & tmc.NODE_IS_SHARED
+
+    def test_non_sample_nodes_not_marked_shared(self):
+        """Test that non-sample nodes are not marked as IS_SHARED when shared_nodes='samples'."""
+        ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
+        ta = tmc.from_tree_sequences(
+            [ts1],
+            ids=[1],
+            symbols=["chr1"],
+            types=["A"],
+            shared_nodes="samples",
+        )
+        ts = ta.contig("chr1")
+        sample_ids = set(ts.samples())
+        for nid in range(ts.num_nodes):
+            if nid not in sample_ids:
+                assert not (ts.tables.nodes[nid].flags & tmc.NODE_IS_SHARED)
+
+    def test_list_of_node_ids_marked_shared(self):
+        """Test marking a specific list of node IDs as IS_SHARED."""
+        ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
+        # ts1 has 5 nodes: 4 samples and 1 ancestor
+        shared_node_ids = [0, 1, 4]  # Mark first two samples and the ancestor
+        ta = tmc.from_tree_sequences(
+            [ts1],
+            ids=[1],
+            symbols=["chr1"],
+            types=["A"],
+            shared_nodes=shared_node_ids,
+        )
+        ts = ta.contig("chr1")
+        # Check that specified nodes have IS_SHARED set
+        for nid in shared_node_ids:
+            assert ts.tables.nodes[nid].flags & tmc.NODE_IS_SHARED, f"Node {nid} not marked"
+        # Check that unspecified nodes do not have IS_SHARED
+        for nid in [2, 3]:
+            assert not (ts.tables.nodes[nid].flags & tmc.NODE_IS_SHARED), f"Node {nid} marked"
+
+    def test_default_indexes(self):
+        """Test that indexes default to [0, 1, 2, ...] when not provided."""
+        ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
+        ts2 = make_ts(seq_len=2000, num_samples=4, mark_shared=False)
+        ta = tmc.from_tree_sequences(
+            [ts1, ts2],
+            ids=[20, 21],
+            symbols=["20", "21"],
+            types=["A", "A"],
+        )
+        # Check that contigs are accessible and in order
+        contigs = ta.contigs
+        assert contigs[0].index == 0
+        assert contigs[1].index == 1
+
+    def test_custom_indexes(self):
+        """Test that custom indexes are respected."""
+        ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
+        ts2 = make_ts(seq_len=2000, num_samples=4, mark_shared=False)
+        ta = tmc.from_tree_sequences(
+            [ts1, ts2],
+            ids=[20, 21],
+            symbols=["20", "21"],
+            types=["A", "A"],
+            indexes=[100, 101],
+        )
+        contigs = ta.contigs
+        assert contigs[0].index == 100
+        assert contigs[1].index == 101
+
+    def test_empty_list_raises(self):
+        """Test that empty tree_sequences list raises ValueError."""
+        with pytest.raises(ValueError, match="empty"):
+            tmc.from_tree_sequences(
+                [],
+                ids=[],
+                symbols=[],
+                types=[],
+            )
+
+    def test_mismatched_ids_raises(self):
+        """Test that mismatched ids length raises ValueError."""
+        ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
+        ts2 = make_ts(seq_len=2000, num_samples=4, mark_shared=False)
+        with pytest.raises(ValueError, match="ids.*same length"):
+            tmc.from_tree_sequences(
+                [ts1, ts2],
+                ids=[20],  # Only one id instead of two
+                symbols=["20", "21"],
+                types=["A", "A"],
+            )
+
+    def test_mismatched_symbols_raises(self):
+        """Test that mismatched symbols length raises ValueError."""
+        ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
+        ts2 = make_ts(seq_len=2000, num_samples=4, mark_shared=False)
+        with pytest.raises(ValueError, match="symbols.*same length"):
+            tmc.from_tree_sequences(
+                [ts1, ts2],
+                ids=[20, 21],
+                symbols=["20"],  # Only one symbol instead of two
+                types=["A", "A"],
+            )
+
+    def test_mismatched_types_raises(self):
+        """Test that mismatched types length raises ValueError."""
+        ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
+        ts2 = make_ts(seq_len=2000, num_samples=4, mark_shared=False)
+        with pytest.raises(ValueError, match="types.*same length"):
+            tmc.from_tree_sequences(
+                [ts1, ts2],
+                ids=[20, 21],
+                symbols=["20", "21"],
+                types=["A"],  # Only one type instead of two
+            )
+
+    def test_mismatched_indexes_raises(self):
+        """Test that mismatched indexes length raises ValueError."""
+        ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
+        ts2 = make_ts(seq_len=2000, num_samples=4, mark_shared=False)
+        with pytest.raises(ValueError, match="indexes.*same length"):
+            tmc.from_tree_sequences(
+                [ts1, ts2],
+                ids=[20, 21],
+                symbols=["20", "21"],
+                types=["A", "A"],
+                indexes=[0],  # Only one index instead of two
+            )
+
+    def test_invalid_shared_nodes_string_raises(self):
+        """Test that invalid shared_nodes string raises ValueError."""
+        ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
+        with pytest.raises(ValueError, match="'samples'"):
+            tmc.from_tree_sequences(
+                [ts1],
+                ids=[1],
+                symbols=["chr1"],
+                types=["A"],
+                shared_nodes="invalid",
+            )
+
+    def test_invalid_shared_nodes_type_raises(self):
+        """Test that non-list shared_nodes raises ValueError."""
+        ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
+        with pytest.raises(ValueError, match="list of node IDs"):
+            tmc.from_tree_sequences(
+                [ts1],
+                ids=[1],
+                symbols=["chr1"],
+                types=["A"],
+                shared_nodes=123,  # Neither "samples" nor list-like
+            )
+
