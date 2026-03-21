@@ -17,6 +17,8 @@ Quick start::
     chr1_ts = ta.contig("chr1")
 
     # Save back to a directory
+    ta.dump("genome_trees")
+    # or equivalently
     tmc.dump(ta, "genome_trees")
 
     # Convert to a single tree sequence
@@ -28,19 +30,17 @@ Quick start::
 
 from .core import (
     ContigKey,
-    TreesArchive,  # backwards-compatible alias
     TreesAssemblage,
     make_contig_key,
     make_permissive_contig_schema,
 )
-from .convert import from_slim, from_tree_sequence, from_ts, to_tree_sequence, to_ts
+from .convert import from_slim, from_ts, to_ts
 from .flags import ARCHIVE_EXTENSION, CONTIG_METADATA_KEY, NODE_IS_SHARED
 from .io import dump, load
 
 __all__ = [
     # Core
     "TreesAssemblage",
-    "TreesArchive",  # backwards-compatible alias
     "ContigKey",
     "make_contig_key",
     "make_permissive_contig_schema",
@@ -50,8 +50,6 @@ __all__ = [
     # Conversion
     "to_ts",
     "from_ts",
-    "to_tree_sequence",    # backwards-compatible alias
-    "from_tree_sequence",  # backwards-compatible alias
     "from_slim",
     # Flags
     "NODE_IS_SHARED",

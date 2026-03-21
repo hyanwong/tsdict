@@ -204,6 +204,24 @@ class TestAccess:
         assert "chr1" in r
         assert "chr2" in r
 
+    def test_keys(self):
+        ta = make_two_contig_archive()
+        k = ta.keys()
+        assert [x.symbol for x in k] == ["chr1", "chr2"]
+
+    def test_values(self):
+        ta = make_two_contig_archive()
+        v = ta.values()
+        assert [ts.sequence_length for ts in v] == [1000, 2000]
+
+    def test_items(self):
+        ta = make_two_contig_archive()
+        items = ta.items()
+        assert len(items) == 2
+        keys, tss = zip(*items)
+        assert [k.symbol for k in keys] == ["chr1", "chr2"]
+        assert [ts.sequence_length for ts in tss] == [1000, 2000]
+
 
 class TestSubset:
     def test_subset_by_symbol(self):

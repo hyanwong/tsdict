@@ -35,8 +35,8 @@ def to_ts(assemblage, record_provenance=True):
 
     Contigs are placed end-to-end in order of their ``index`` values.
     Shared nodes (those with :data:`~tskit_multichrom.flags.NODE_IS_SHARED` set)
-    retain their original node IDs. Non-shared nodes are appended after the
-    last shared node for each contig and receive new IDs.
+    retain their original node IDs in the merged tree sequence. Non-shared nodes
+    receive new IDs, assigned after all shared nodes have been placed.
 
     Site and mutation metadata schemas must be identical across all contigs,
     otherwise a :class:`ValueError` is raised.
@@ -545,6 +545,3 @@ def _try_add_vacant_flags(metadata_bytes, vacant_bitflags, schema):
     except Exception:
         return metadata_bytes
 
-# Backwards-compatible aliases
-to_tree_sequence = to_ts
-from_tree_sequence = from_ts

@@ -18,13 +18,16 @@ ContigKey = collections.namedtuple("ContigKey", ["index", "id", "symbol", "type"
 
 class TreesAssemblage:
     """
-    A collection of tree sequences representing multiple contigs (chromosomes).
+    A dictionary-like collection of tree sequences representing multiple contigs
+    (chromosomes), with additional methods that allow manipulation or analysis of
+    all contigs simultaneously.
 
-    Each tree sequence is stored under a :class:`ContigKey` namedtuple.
+    Each tree sequence is stored under a :class:`ContigKey`. However, for
+    convenience they can also be accessed by id or symbol using the
+    :meth:`contig` method.
+
     The assemblage enforces a set of consistency requirements across the
     constituent tree sequences (see :meth:`_validate`).
-
-    Access contigs via :meth:`contig` (by id, symbol, or index).
 
     Parameters
     ----------
@@ -279,7 +282,7 @@ class TreesAssemblage:
 
     @property
     def contigs(self):
-        """list[ContigKey]: Contig keys sorted by index."""
+        """list[ContigKey]: Contig keys sorted by index. Equivalent to ta.keys()."""
         return list(self._sorted_keys)
 
     @property
@@ -307,6 +310,21 @@ class TreesAssemblage:
         """int: Number of contigs in the assemblage."""
         return len(self._tree_sequences)
 
+    # ------------------------------------------------------------------
+    # Dictionary-like interface
+    # ------------------------------------------------------------------
+
+    def keys(self):
+        """Return ContigKeys sorted by index (like dict.keys(), but as a list)."""
+        return list(self._sorted_keys)
+
+    def values(self):
+        """Return tree sequences sorted by contig index (like dict.values(), but as a list)."""
+        return [self._tree_sequences[k] for k in self._sorted_keys]
+
+    def items(self):
+        """Return (ContigKey, TreeSequence) pairs sorted by index (like dict.items(), but as a list)."""
+        return [(k, self._tree_sequences[k]) for k in self._sorted_keys]
     # ------------------------------------------------------------------
     # Contig access
     # ------------------------------------------------------------------
@@ -480,9 +498,27 @@ class TreesAssemblage:
 
         return TreesAssemblage(new_ts)
 
+    # ------------------------------------------------------------------
+    # I/O
+    # ------------------------------------------------------------------
 
-# Backwards-compatible alias
-TreesArchive = TreesAssemblage
+    def dump(self, path, *, compress=False):
+        """
+        Save this assemblage to a trees archive.
+
+        This is a convenience wrapper around :func:`tskit_multichrom.io.dump`.
+        See that function for full documentation.
+
+        Parameters
+        ----------
+        path : str or path-like
+            Destination directory or zip file path.
+        compress : bool
+            If True, compress each tree sequence with tszip (``.tsz`` files).
+        """
+        from .io import dump as _dump
+
+        _dump(self, path, compress=compress)
 
 
 # ------------------------------------------------------------------

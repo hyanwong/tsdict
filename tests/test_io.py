@@ -141,3 +141,27 @@ class TestDumpLoadDir:
         with tempfile.TemporaryDirectory() as tmpdir:
             with pytest.raises(ValueError, match="No .trees"):
                 tmc.load(tmpdir)
+
+
+class TestDumpMethod:
+    """Tests for TreesAssemblage.dump() instance method."""
+
+    def test_dump_method_zip(self):
+        ta = make_two_contig_archive()
+        with tempfile.NamedTemporaryFile(suffix="_trees.zip", delete=False) as f:
+            path = f.name
+        try:
+            ta.dump(path)
+            ta2 = tmc.load(path)
+            assert ta2.num_contigs == 2
+            assert ta2.total_sequence_length == ta.total_sequence_length
+        finally:
+            os.unlink(path)
+
+    def test_dump_method_dir(self):
+        ta = make_two_contig_archive()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "genome_trees")
+            ta.dump(path)
+            ta2 = tmc.load(path)
+            assert ta2.num_contigs == 2
