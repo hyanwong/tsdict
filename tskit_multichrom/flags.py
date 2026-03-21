@@ -4,8 +4,8 @@ Flag constants for tskit_multichrom.
 
 # Node flag indicating that this node is shared (cross-phased) across all
 # contigs in a TreesArchive. This bit is set in the node flags field.
-# We use bit 1 (value 2) to avoid collision with tskit.NODE_IS_SAMPLE (bit 0).
-NODE_IS_SHARED = 1 << 20  # Use a high bit to avoid conflicts with SLiM flags
+# We use bit 20 to avoid conflicts with tskit (bit 0) and SLiM (bits 16–19).
+NODE_IS_SHARED = 1 << 20
 
 # File extension for a trees archive (zip of .trees files)
 ARCHIVE_EXTENSION = ".tsa"

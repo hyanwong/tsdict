@@ -126,8 +126,6 @@ def to_tree_sequence(archive, record_provenance=True):
     # ------------------------------------------------------------------
     # 4. Build top-level metadata for the merged TS
     # ------------------------------------------------------------------
-    import json as _json
-
     contigs_meta = []
     for key in sorted_keys:
         ts = archive[key]
