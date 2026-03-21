@@ -106,3 +106,4 @@ def _iter_sample_ids(sample_sets):
         else:
             for sid in sample_set:
                 yield int(sid)
+

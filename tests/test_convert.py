@@ -14,18 +14,18 @@ from tests.conftest import make_autosomes_plus_x_archive, make_ts, make_two_cont
 class TestToTreeSequence:
     def test_basic(self):
         ta = make_two_contig_archive()
-        ts = tmc.to_ts(ta)
+        ts = ta.to_ts()
         assert isinstance(ts, tskit.TreeSequence)
         assert ts.sequence_length == ta.total_sequence_length
 
     def test_metadata_present(self):
         ta = make_two_contig_archive()
-        ts = tmc.to_ts(ta)
+        ts = ta.to_ts()
         assert "contigs" in ts.metadata
 
     def test_contigs_in_metadata(self):
         ta = make_two_contig_archive()
-        ts = tmc.to_ts(ta)
+        ts = ta.to_ts()
         meta = ts.metadata["contigs"]
         assert len(meta) == 2
         symbols = [c["contig"]["symbol"] for c in meta]
@@ -35,7 +35,7 @@ class TestToTreeSequence:
     def test_empty_raises(self):
         ta = tmc.TreesAssemblage({})
         with pytest.raises(ValueError, match="empty"):
-            tmc.to_ts(ta)
+            ta.to_ts()
 
     def test_site_schema_mismatch_raises(self):
         ts1 = make_ts(
@@ -59,12 +59,12 @@ class TestToTreeSequence:
             }
         )
         with pytest.raises(ValueError, match="[Ss]ite"):
-            tmc.to_ts(ta)
+            ta.to_ts()
 
     def test_shared_nodes_have_same_id(self):
         """Shared nodes should retain their IDs in the merged tree sequence."""
         ta = make_two_contig_archive(mark_shared=True)
-        ts = tmc.to_ts(ta)
+        ts = ta.to_ts()
 
         # Nodes 0..4 (4 samples + 1 ancestral) should all have IS_SHARED set
         for node_id in range(5):
@@ -73,23 +73,23 @@ class TestToTreeSequence:
 
     def test_sequence_length(self):
         ta = make_two_contig_archive()
-        ts = tmc.to_ts(ta)
+        ts = ta.to_ts()
         assert ts.sequence_length == 3000  # 1000 + 2000
 
     def test_record_provenance_false(self):
         ta = make_two_contig_archive()
-        ts = tmc.to_ts(ta, record_provenance=False)
+        ts = ta.to_ts(record_provenance=False)
         assert ts.num_provenances == ta.contig("chr1").num_provenances
 
     def test_record_provenance_true_adds_entry(self):
         ta = make_two_contig_archive()
         ref_count = ta.contig("chr1").num_provenances
-        ts = tmc.to_ts(ta, record_provenance=True)
+        ts = ta.to_ts(record_provenance=True)
         assert ts.num_provenances == ref_count + 1
 
     def test_record_provenance_true_entry_has_version(self):
         ta = make_two_contig_archive()
-        ts = tmc.to_ts(ta, record_provenance=True)
+        ts = ta.to_ts(record_provenance=True)
         record = json.loads(ts.tables.provenances[-1].record)
         assert record["software"]["name"] == "tskit_multichrom"
         assert record["software"]["version"] == tmc.__version__
@@ -119,7 +119,7 @@ class TestToTreeSequence:
                 tmc.ContigKey(1, 1, "chr2", "A"): ts2,
             }
         )
-        merged = tmc.to_ts(ta)
+        merged = ta.to_ts()
         positions = list(merged.tables.sites.position)
         assert 500.0 in positions  # from chr1
         assert 1500.0 in positions  # from chr2 (500 + 1000)
@@ -135,7 +135,7 @@ class TestToTreeSequence:
         assert len(autosome_only_samples) > 0
 
         # Merge and verify is_vacant bits are set for missing chrX
-        merged = tmc.to_ts(ta)
+        merged = ta.to_ts()
         x_index = 2  # chrX index in make_autosomes_plus_x_archive
 
         for nid in autosome_only_samples:
@@ -153,20 +153,20 @@ class TestToTreeSequence:
 class TestFromTreeSequence:
     def test_roundtrip(self):
         ta = make_two_contig_archive()
-        ts = tmc.to_ts(ta)
+        ts = ta.to_ts()
         ta2 = tmc.from_ts(ts)
         assert ta2.num_contigs == 2
 
     def test_roundtrip_sequence_lengths(self):
         ta = make_two_contig_archive()
-        ts = tmc.to_ts(ta)
+        ts = ta.to_ts()
         ta2 = tmc.from_ts(ts)
         assert ta2.contig("chr1").sequence_length == 1000
         assert ta2.contig("chr2").sequence_length == 2000
 
     def test_roundtrip_contig_metadata(self):
         ta = make_two_contig_archive()
-        ts = tmc.to_ts(ta)
+        ts = ta.to_ts()
         ta2 = tmc.from_ts(ts)
         meta = ta2.contig("chr1").metadata[tmc.CONTIG_METADATA_KEY]
         assert meta["symbol"] == "chr1"
@@ -174,27 +174,27 @@ class TestFromTreeSequence:
 
     def test_record_provenance_kwarg(self):
         ta = make_two_contig_archive()
-        ts = tmc.to_ts(ta)
+        ts = ta.to_ts()
         ta2 = tmc.from_ts(ts, record_provenance=False)
         assert ta2.num_contigs == 2
 
     def test_from_ts_record_provenance_false(self):
         ta = make_two_contig_archive()
-        ts = tmc.to_ts(ta, record_provenance=False)
+        ts = ta.to_ts(record_provenance=False)
         ta2 = tmc.from_ts(ts, record_provenance=False)
         assert ta2.contig("chr1").num_provenances == 0
         assert ta2.contig("chr2").num_provenances == 0
 
     def test_from_ts_record_provenance_true(self):
         ta = make_two_contig_archive()
-        ts = tmc.to_ts(ta, record_provenance=False)
+        ts = ta.to_ts(record_provenance=False)
         ta2 = tmc.from_ts(ts, record_provenance=True)
         assert ta2.contig("chr1").num_provenances == 1
         assert ta2.contig("chr2").num_provenances == 1
 
     def test_from_ts_record_provenance_true_entry_has_version(self):
         ta = make_two_contig_archive()
-        ts = tmc.to_ts(ta, record_provenance=False)
+        ts = ta.to_ts(record_provenance=False)
         ta2 = tmc.from_ts(ts, record_provenance=True)
         record = json.loads(ta2.contig("chr1").tables.provenances[-1].record)
         assert record["software"]["name"] == "tskit_multichrom"
@@ -219,7 +219,7 @@ class TestFromTreeSequence:
         orig_samples = {key: set(ta[key].samples()) for key in ta.contigs}
 
         # Roundtrip: to_ts encodes is_vacant bits, from_ts should decode them
-        merged = tmc.to_ts(ta)
+        merged = ta.to_ts()
         reconstructed = tmc.from_ts(merged)
 
         # Verify sample markings are correctly restored

@@ -21,7 +21,7 @@ class TestDumpLoadZip:
         with tempfile.NamedTemporaryFile(suffix="_trees.zip", delete=False) as f:
             path = f.name
         try:
-            tmc.dump(ta, path)
+            ta.dump(path)
             ta2 = tmc.load(path)
             assert ta2.num_contigs == 2
             assert ta2.total_sequence_length == ta.total_sequence_length
@@ -33,7 +33,7 @@ class TestDumpLoadZip:
         with tempfile.NamedTemporaryFile(suffix="_trees.zip", delete=False) as f:
             path = f.name
         try:
-            tmc.dump(ta, path)
+            ta.dump(path)
             ta2 = tmc.load(path)
             assert ta2.contig("chr1").sequence_length == 1000
             assert ta2.contig("chr2").sequence_length == 2000
@@ -46,7 +46,7 @@ class TestDumpLoadZip:
         with tempfile.NamedTemporaryFile(suffix="_trees.zip", delete=False) as f:
             path = f.name
         try:
-            tmc.dump(ta, path)
+            ta.dump(path)
             with zipfile.ZipFile(path, "r") as zf:
                 names = zf.namelist()
             assert "chr1.trees" in names
@@ -60,7 +60,7 @@ class TestDumpLoadZip:
         with tempfile.NamedTemporaryFile(suffix="_trees.zip", delete=False) as f:
             path = f.name
         try:
-            tmc.dump(ta, path)
+            ta.dump(path)
             with zipfile.ZipFile(path, "r") as zf:
                 for info in zf.infolist():
                     assert info.compress_type == zipfile.ZIP_STORED, (
@@ -95,7 +95,7 @@ class TestDumpLoadZip:
         with tempfile.NamedTemporaryFile(suffix="_trees.zip", delete=False) as f:
             path = f.name
         try:
-            tmc.dump(ta, path)
+            ta.dump(path)
             ta2 = tmc.load(path)
             ts = ta2.contig("chr1")
             for node_id in range(ts.num_nodes):
@@ -114,7 +114,7 @@ class TestDumpLoadDir:
         ta = make_two_contig_archive()
         with tempfile.TemporaryDirectory() as tmpdir:
             path = os.path.join(tmpdir, "genome_trees")
-            tmc.dump(ta, path)
+            ta.dump(path)
             ta2 = tmc.load(path)
             assert ta2.num_contigs == 2
             assert ta2.total_sequence_length == ta.total_sequence_length
@@ -123,7 +123,7 @@ class TestDumpLoadDir:
         ta = make_two_contig_archive()
         with tempfile.TemporaryDirectory() as tmpdir:
             path = os.path.join(tmpdir, "genome_trees")
-            tmc.dump(ta, path)
+            ta.dump(path)
             ta2 = tmc.load(path)
             assert ta2.contig("chr1").sequence_length == 1000
             assert ta2.contig("chr2").sequence_length == 2000
@@ -132,7 +132,7 @@ class TestDumpLoadDir:
         ta = make_two_contig_archive()
         with tempfile.TemporaryDirectory() as tmpdir:
             path = os.path.join(tmpdir, "genome_trees")
-            tmc.dump(ta, path)
+            ta.dump(path)
             files = os.listdir(path)
         assert "chr1.trees" in files
         assert "chr2.trees" in files

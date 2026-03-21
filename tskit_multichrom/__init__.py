@@ -26,11 +26,9 @@ Quick start::
 
     # Save back to a directory
     ta.dump("genome_trees")
-    # or equivalently
-    tmc.dump(ta, "genome_trees")
 
     # Convert to a single tree sequence
-    ts = tmc.to_ts(ta)
+    ts = ta.to_ts()
 
     # Convert back
     ta2 = tmc.from_ts(ts)
@@ -41,9 +39,9 @@ from .core import (
     TreesAssemblage,
     make_contig_key,
 )
-from .convert import from_slim, from_tree_sequences, from_ts, to_ts
+from .convert import from_slim, from_tree_sequences, from_ts
 from .flags import ARCHIVE_EXTENSION, CONTIG_METADATA_KEY, NODE_IS_SHARED
-from .io import dump, load
+from .io import load
 from ._version import tskit_multichrom_version as __version__
 
 __all__ = [
@@ -53,9 +51,7 @@ __all__ = [
     "make_contig_key",
     # I/O
     "load",
-    "dump",
     # Conversion
-    "to_ts",
     "from_ts",
     "from_slim",
     "from_tree_sequences",
