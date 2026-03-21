@@ -520,13 +520,13 @@ def from_tree_sequences(
     symbols,
     types,
     indexes=None,
-    shared_nodes="samples",
+    shared_nodes=None,
 ):
     """
     Create a :class:`TreesAssemblage` from a list of tree sequences without contig metadata.
 
     This function combines multiple independent tree sequences into a TreesAssemblage,
-    automatically annotating them with contig metadata and marking shared nodes.
+    automatically annotating them with contig metadata and optionally marking shared nodes.
 
     Parameters
     ----------
@@ -546,7 +546,8 @@ def from_tree_sequences(
     shared_nodes : str or list[int], optional
         Which nodes to mark with :data:`~tskit_multichrom.flags.NODE_IS_SHARED`:
 
-        - ``"samples"`` (default): Mark all sample nodes as IS_SHARED.
+        - ``None`` (default): Do not mark any nodes as IS_SHARED.
+        - ``"samples"``: Mark all sample nodes as IS_SHARED.
         - list-like of int: Mark the specified node IDs as IS_SHARED across all contigs.
 
     Returns
@@ -558,11 +559,20 @@ def from_tree_sequences(
     ------
     ValueError
         If the lengths of ``ids``, ``symbols``, ``types``, or ``indexes`` do not match
-        the length of ``tree_sequences``, or if ``shared_nodes`` is neither the string
-        ``"samples"`` nor a list-like of integers.
+        the length of ``tree_sequences``, or if ``shared_nodes`` is neither None, the string
+        ``"samples"``, nor a list-like of integers.
 
     Examples
     --------
+    >>> ta = from_tree_sequences(
+    ...     [ts20, ts21],
+    ...     ids=[20, 21],
+    ...     symbols=["20", "21"],
+    ...     types=["A", "A"],
+    ... )
+
+    Mark all sample nodes as shared:
+
     >>> ta = from_tree_sequences(
     ...     [ts20, ts21],
     ...     ids=[20, 21],
@@ -587,20 +597,26 @@ def from_tree_sequences(
             "If provided, indexes must have the same length as tree_sequences"
         )
 
-    # Validate shared_nodes parameter
-    if isinstance(shared_nodes, str):
+    # Validate and process shared_nodes parameter
+    # mark_strategy will be:
+    #   None = don't mark anything
+    #   "samples" = mark all sample nodes
+    #   set of ints = mark specific node IDs
+    if shared_nodes is None:
+        mark_strategy = None
+    elif isinstance(shared_nodes, str):
         if shared_nodes != "samples":
             raise ValueError(
                 f"shared_nodes string must be 'samples', got {shared_nodes!r}"
             )
-        shared_node_ids = None  # marker: mark sample nodes
+        mark_strategy = "samples"
     else:
         # Assume list-like of node IDs
         try:
-            shared_node_ids = set(int(nid) for nid in shared_nodes)
+            mark_strategy = set(int(nid) for nid in shared_nodes)
         except (TypeError, ValueError) as e:
             raise ValueError(
-                "shared_nodes must be 'samples' or a list of node IDs"
+                "shared_nodes must be None, 'samples', or a list of node IDs"
             ) from e
 
     # Build TreesAssemblage dict
@@ -614,18 +630,19 @@ def from_tree_sequences(
         # Modify flags by creating a new array with selective modifications
         flags = tables.nodes.flags.copy()
 
-        if shared_node_ids is None:
+        if mark_strategy == "samples":
             # Mark all sample nodes as IS_SHARED
             sample_node_ids = ts.samples()
             flags[sample_node_ids] = flags[sample_node_ids] | NODE_IS_SHARED
-        else:
+        elif mark_strategy is not None:
             # Mark specified node IDs as IS_SHARED (if they exist in this tree sequence)
             node_ids_to_mark = np.array(
-                [nid for nid in shared_node_ids if nid < ts.num_nodes],
+                [nid for nid in mark_strategy if nid < ts.num_nodes],
                 dtype=int
             )
             if len(node_ids_to_mark) > 0:
                 flags[node_ids_to_mark] = flags[node_ids_to_mark] | NODE_IS_SHARED
+        # else: mark_strategy is None, don't mark anything
         
         # Update the tables with the complete modified flags array
         tables.nodes.flags = flags

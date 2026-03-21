@@ -19,7 +19,6 @@ Quick start::
         ids=[1, 2],
         symbols=["chr1", "chr2"],
         types=["A", "A"],
-        shared_nodes="samples",
     )
 
     # Access a contig by symbol

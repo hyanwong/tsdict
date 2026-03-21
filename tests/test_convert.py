@@ -268,7 +268,7 @@ class TestFromSlim:
 
 class TestFromTreeSequences:
     def test_basic(self):
-        """Test basic construction with mark_shared='samples'."""
+        """Test basic construction with default shared_nodes=None."""
         ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
         ts2 = make_ts(seq_len=2000, num_samples=4, mark_shared=False)
         ta = tmc.from_tree_sequences(
@@ -276,11 +276,24 @@ class TestFromTreeSequences:
             ids=[20, 21],
             symbols=["20", "21"],
             types=["A", "A"],
-            shared_nodes="samples",
         )
         assert ta.num_contigs == 2
         assert ta.contig("20").sequence_length == 1000
         assert ta.contig("21").sequence_length == 2000
+
+    def test_default_shared_nodes_none(self):
+        """Test that the default shared_nodes=None marks no nodes as IS_SHARED."""
+        ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
+        ta = tmc.from_tree_sequences(
+            [ts1],
+            ids=[1],
+            symbols=["chr1"],
+            types=["A"],
+        )
+        ts = ta.contig("chr1")
+        # Verify that no nodes have IS_SHARED marked
+        for nid in range(ts.num_nodes):
+            assert not (ts.tables.nodes[nid].flags & tmc.NODE_IS_SHARED)
 
     def test_contig_keys_created(self):
         """Test that ContigKey objects are created with correct values."""
