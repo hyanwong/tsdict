@@ -16,6 +16,7 @@ records per-contig ``sequence_length``, ``num_nodes``, and ``contig``.
 are implicitly shared) into a :class:`TreesAssemblage`.
 """
 
+import copy
 import warnings
 import json
 
@@ -23,7 +24,7 @@ import numpy as np
 import tskit
 
 from ._version import tskit_multichrom_version
-from .core import TreesAssemblage, make_contig_key
+from .core import ContigKey, TreesAssemblage, make_contig_key
 from .flags import CONTIG_METADATA_KEY, NODE_IS_SHARED
 
 # Top-level metadata key used in the single-TS representation
@@ -511,6 +512,164 @@ def from_slim(tree_sequences, *, slim_metadata_key="SLiM"):
         result[key] = tables.tree_sequence()
 
     return TreesAssemblage(result)
+
+
+def from_tree_sequences(
+    tree_sequences,
+    ids,
+    symbols,
+    types,
+    indexes=None,
+    shared_nodes="samples",
+):
+    """
+    Create a :class:`TreesAssemblage` from a list of tree sequences without contig metadata.
+
+    This function combines multiple independent tree sequences into a TreesAssemblage,
+    automatically annotating them with contig metadata and marking shared nodes.
+
+    Parameters
+    ----------
+    tree_sequences : list[tskit.TreeSequence]
+        Tree sequences to assemble, one per contig.
+    ids : list[int]
+        Contig IDs (one per tree sequence).
+    symbols : list[str]
+        Contig symbols, e.g., ``["20", "21"]`` or ``["chrX", "chrY"]``
+        (one per tree sequence).
+    types : list[str]
+        Contig types (one per tree sequence). Examples: ``"A"`` for autosome,
+        ``"X"``, ``"Y"``, or ``"MT"``.
+    indexes : list[int], optional
+        Contig indexes (ordering integers, one per tree sequence). If None,
+        defaults to ``[0, 1, 2, ...]``.
+    shared_nodes : str or list[int], optional
+        Which nodes to mark with :data:`~tskit_multichrom.flags.NODE_IS_SHARED`:
+
+        - ``"samples"`` (default): Mark all sample nodes as IS_SHARED.
+        - list-like of int: Mark the specified node IDs as IS_SHARED across all contigs.
+
+    Returns
+    -------
+    TreesAssemblage
+        A new TreesAssemblage with contigs in index order.
+
+    Raises
+    ------
+    ValueError
+        If the lengths of ``ids``, ``symbols``, ``types``, or ``indexes`` do not match
+        the length of ``tree_sequences``, or if ``shared_nodes`` is neither the string
+        ``"samples"`` nor a list-like of integers.
+
+    Examples
+    --------
+    >>> ta = from_tree_sequences(
+    ...     [ts20, ts21],
+    ...     ids=[20, 21],
+    ...     symbols=["20", "21"],
+    ...     types=["A", "A"],
+    ...     shared_nodes="samples",
+    ... )
+    """
+    if not tree_sequences:
+        raise ValueError("tree_sequences list cannot be empty")
+
+    n = len(tree_sequences)
+    if len(ids) != n or len(symbols) != n or len(types) != n:
+        raise ValueError(
+            "ids, symbols, and types must have the same length as tree_sequences"
+        )
+
+    if indexes is None:
+        indexes = list(range(n))
+    elif len(indexes) != n:
+        raise ValueError(
+            "If provided, indexes must have the same length as tree_sequences"
+        )
+
+    # Validate shared_nodes parameter
+    if isinstance(shared_nodes, str):
+        if shared_nodes != "samples":
+            raise ValueError(
+                f"shared_nodes string must be 'samples', got {shared_nodes!r}"
+            )
+        shared_node_ids = None  # marker: mark sample nodes
+    else:
+        # Assume list-like of node IDs
+        try:
+            shared_node_ids = set(int(nid) for nid in shared_nodes)
+        except (TypeError, ValueError) as e:
+            raise ValueError(
+                "shared_nodes must be 'samples' or a list of node IDs"
+            ) from e
+
+    # Build TreesAssemblage dict
+    ta_dict = {}
+    for i, (ts, idx, contig_id, symbol, typ) in enumerate(
+        zip(tree_sequences, indexes, ids, symbols, types)
+    ):
+        # Copy and modify tables to mark shared nodes
+        tables = ts.dump_tables()
+        
+        # Modify flags by creating a new array with selective modifications
+        flags = tables.nodes.flags.copy()
+
+        if shared_node_ids is None:
+            # Mark all sample nodes as IS_SHARED
+            sample_node_ids = ts.samples()
+            flags[sample_node_ids] = flags[sample_node_ids] | NODE_IS_SHARED
+        else:
+            # Mark specified node IDs as IS_SHARED (if they exist in this tree sequence)
+            node_ids_to_mark = np.array(
+                [nid for nid in shared_node_ids if nid < ts.num_nodes],
+                dtype=int
+            )
+            if len(node_ids_to_mark) > 0:
+                flags[node_ids_to_mark] = flags[node_ids_to_mark] | NODE_IS_SHARED
+        
+        # Update the tables with the complete modified flags array
+        tables.nodes.flags = flags
+
+        # Add 'contig' key to top-level metadata
+        contig_dict = {
+            "index": int(idx),
+            "id": int(contig_id),
+            "symbol": str(symbol),
+            "type": str(typ),
+        }
+        
+        # Get current metadata
+        meta = ts.metadata
+        if not isinstance(meta, dict):
+            meta = {}
+        else:
+            meta = dict(meta)  # Copy to avoid mutating original
+        
+        meta[CONTIG_METADATA_KEY] = contig_dict
+        
+        # Ensure top-level metadata schema is permissive JSON
+        existing_schema = ts.metadata_schema.schema
+        if not existing_schema or existing_schema.get("codec") != "json":
+            tables.metadata_schema = tskit.MetadataSchema.permissive_json()
+        else:
+            # Ensure the schema allows the contig key
+            schema_dict = copy.deepcopy(existing_schema)
+            schema_dict.setdefault("additionalProperties", True)
+            if "properties" not in schema_dict:
+                schema_dict["properties"] = {}
+            schema_dict["properties"][CONTIG_METADATA_KEY] = {
+                "type": "object",
+                "additionalProperties": True,
+            }
+            tables.metadata_schema = tskit.MetadataSchema(schema_dict)
+        
+        tables.metadata = meta
+        
+        ts_final = tables.tree_sequence()
+        key = ContigKey(index=idx, id=contig_id, symbol=symbol, type=typ)
+        ta_dict[key] = ts_final
+
+    return TreesAssemblage(ta_dict)
 
 
 def _get_shared_for_contig(ts, is_shared_global, contig_index):
