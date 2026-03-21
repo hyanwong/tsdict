@@ -59,7 +59,7 @@ The central object holding a collection of per-contig tree sequences:
 ```python
 # Access by symbol or id
 ts = ta.contig("chr20")        # by symbol
-ts = ta.contig(20)              # by id
+ts = ta.contig(20)             # by id
 
 # Iterate over contigs
 for key, ts in ta.items():
