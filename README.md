@@ -7,7 +7,7 @@ A Python library for efficiently storing and analyzing multiple chromosomes (con
 Population genetics simulators like **msprime** and **SLiM** (prior to v5) typically produce separate tree sequences for each chromosome. `tskit_multichrom` provides:
 
 - **Unified storage**: Manage multiple per-chromosome tree sequences as a single `TreesAssemblage` object
-- **Cross-chromosome analysis**: Compute statistics across all chromosomes when samples are shared (e.g., diversity)
+- **Cross-chromosome analysis**: Compute statistics across all chromosomes when samples are shared (e.g., diversity, PCA)
 - **Efficient subsetting**: Create subsets (e.g., autosomes only) without copying underlying tree sequences
 - **Format conversion**: Convert between multi-contig archives and single merged tree sequences
 - **SLiM compatibility**: Seamless conversion to/from SLiM's tree sequence archives
@@ -94,8 +94,9 @@ diversity = ta.stats.diversity()
 # With specific samples
 diversity = ta.stats.diversity(sample_sets=[[0, 1, 2], [3, 4, 5]])
 
-# By individual across all contigs
-diversity = ta.stats.diversity(individuals=[0, 1])
+# Some stats can be run by individual (e.g. PCA)
+# These do not require phasing across chromosomes
+pca_result = ta.stats.pca(num_components=2, individuals=[0, 1, 2, 3])
 ```
 
 ### Format Conversion

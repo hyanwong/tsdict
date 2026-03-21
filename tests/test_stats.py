@@ -134,3 +134,80 @@ class TestDiversity:
         simplified_value = ta_shared.stats.diversity()
 
         assert simplified_value == pytest.approx(explicit_value)
+
+
+class TestPCA:
+    def test_pca_default_matches_to_ts(self):
+        ta = _make_two_contig_archive_shared_samples_only()
+        samples = np.asarray(sorted(ta.global_phased_node_ids), dtype=np.int32)
+        expected = ta.to_ts().pca(num_components=2, samples=samples, random_seed=42)
+        actual = ta.stats.pca(num_components=2, random_seed=42)
+
+        assert actual.eigenvalues == pytest.approx(expected.eigenvalues)
+        assert np.abs(actual.factors) == pytest.approx(np.abs(expected.factors))
+
+    def test_pca_with_explicit_samples(self):
+        ta = _make_two_contig_archive_shared_samples_only()
+        samples = sorted(ta.global_phased_node_ids)[:2]
+        result = ta.stats.pca(num_components=1, samples=samples, random_seed=1)
+        assert result.factors.shape == (2, 1)
+
+    def test_pca_samples_must_be_globally_phased(self):
+        ta = make_autosomes_plus_x_archive()
+        nonglobal = sorted(
+            set(range(ta.contig("chr1").num_samples)) - ta.global_phased_node_ids
+        )
+        assert len(nonglobal) > 0, "expected nonglobal sample nodes"
+        with pytest.raises(ValueError, match="global_phased_node_ids"):
+            ta.stats.pca(num_components=1, samples=nonglobal, random_seed=1)
+
+    def test_pca_default_raises_for_nonglobal_sample_arg(self):
+        ta = make_autosomes_plus_x_archive()
+        assert ta.is_nonglobal_sample_arg
+        with pytest.raises(ValueError, match="individuals or samples"):
+            ta.stats.pca(num_components=1)
+
+    def test_pca_with_individuals_rejects_mixed_types(self):
+        ta = make_autosomes_plus_x_archive()
+        assert ta.is_nonglobal_sample_arg
+        with pytest.raises(ValueError, match="same type"):
+            ta.stats.pca(num_components=1, individuals=[0, 1])
+
+    def test_pca_with_individuals_matches_to_ts(self):
+        ta = _make_two_contig_archive_shared_samples_only()
+        individuals = [0, 1]
+        expected = ta.to_ts().pca(
+            num_components=1, individuals=individuals, random_seed=42
+        )
+        actual = ta.stats.pca(
+            num_components=1, individuals=individuals, random_seed=42
+        )
+        assert actual.eigenvalues == pytest.approx(expected.eigenvalues)
+        assert np.abs(actual.factors) == pytest.approx(np.abs(expected.factors))
+
+    def test_pca_cannot_specify_samples_and_individuals(self):
+        ta = _make_two_contig_archive_shared_samples_only()
+        with pytest.raises(ValueError, match="Cannot specify both"):
+            ta.stats.pca(num_components=1, samples=[0], individuals=[0])
+
+    def test_pca_with_individuals_fully_nonglobal_sample_arg(self):
+        ta = make_two_contig_archive(mark_shared=False)
+        assert ta.is_nonglobal_sample_arg
+        assert len(ta.global_phased_node_ids) == 0
+
+        with pytest.raises(ValueError, match="individuals or samples"):
+            ta.stats.pca(num_components=1)
+
+        individuals = [0, 1]
+        ts_compact = ta.to_ts()
+        ts_compact = ts_compact.simplify(
+            samples=ts_compact.samples(), record_provenance=False
+        )
+        expected = ts_compact.pca(
+            num_components=1, individuals=individuals, random_seed=7
+        )
+        actual = ta.stats.pca(
+            num_components=1, individuals=individuals, random_seed=7
+        )
+        assert actual.eigenvalues == pytest.approx(expected.eigenvalues)
+        assert np.abs(actual.factors) == pytest.approx(np.abs(expected.factors))
