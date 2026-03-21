@@ -75,8 +75,8 @@ print(ta.global_phased_node_ids)    # Shared sample node IDs
 
 ```python
 # Subset by type, symbol, id, or index
-autosomes = ta.subset(type="A")  # includes all of them in this case
-chr20 = ta.subset(symbols=["chr20", "chr21"])
+autosomes = ta.subset(type="A")  # includes all the chromosomes in this case
+chr20and21 = ta.subset(symbols=["chr20", "chr21"])
 
 # Reindex contigs to 0..N
 ta_reindexed = ta.reindex()
