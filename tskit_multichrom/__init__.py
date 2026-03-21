@@ -13,6 +13,14 @@ Quick start::
     # Load from a directory or zip archive
     ta = tmc.load("genome_trees")
 
+    # Create from a list of tree sequences
+    ta = tmc.from_tree_sequences(
+        [ts1, ts2],
+        ids=[1, 2],
+        symbols=["chr1", "chr2"],
+        types=["A", "A"],
+    )
+
     # Access a contig by symbol
     chr1_ts = ta.contig("chr1")
 
@@ -33,7 +41,7 @@ from .core import (
     TreesAssemblage,
     make_contig_key,
 )
-from .convert import from_slim, from_ts, to_ts
+from .convert import from_slim, from_tree_sequences, from_ts, to_ts
 from .flags import ARCHIVE_EXTENSION, CONTIG_METADATA_KEY, NODE_IS_SHARED
 from .io import dump, load
 from ._version import tskit_multichrom_version as __version__
@@ -50,6 +58,7 @@ __all__ = [
     "to_ts",
     "from_ts",
     "from_slim",
+    "from_tree_sequences",
     # Flags
     "NODE_IS_SHARED",
     "CONTIG_METADATA_KEY",
