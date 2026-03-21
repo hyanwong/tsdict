@@ -252,7 +252,7 @@ class TreesAssemblage:
         global_phased = self._cache["global_phased_node_ids"]
         nonglobal = all_sample_ids - global_phased
         self._cache["nonglobal_sample_node_count"] = len(nonglobal)
-        self._cache["is_partial_sample_arg"] = len(nonglobal) > 0
+        self._cache["is_nonglobal_sample_arg"] = len(nonglobal) > 0
 
         # Index by id and symbol for fast lookup
         self._by_id = {k.id: k for k in self._tree_sequences}
@@ -317,19 +317,14 @@ class TreesAssemblage:
         return set(self._cache["shared_node_ids"])
 
     @property
-    def cross_phased_node_ids(self):
-        """set[int]: Alias for global_phased_node_ids (backward compatibility)."""
-        return self.global_phased_node_ids
-
-    @property
     def nonglobal_sample_node_count(self):
         """int: Number of sample nodes not shared in all contigs."""
         return self._cache["nonglobal_sample_node_count"]
 
     @property
-    def is_partial_sample_arg(self):
+    def is_nonglobal_sample_arg(self):
         """bool: True if there are any nonglobal sample nodes."""
-        return self._cache["is_partial_sample_arg"]
+        return self._cache["is_nonglobal_sample_arg"]
 
     @property
     def num_contigs(self):
@@ -553,6 +548,122 @@ class TreesAssemblage:
         from .io import dump as _dump
 
         _dump(self, path, compress=compress)
+
+    def to_ts(self, record_provenance=True):
+        """
+        Merge this assemblage into a single :class:`tskit.TreeSequence`.
+
+        This is a convenience wrapper around :func:`tskit_multichrom.convert.to_ts`.
+        See that function for full documentation.
+
+        Parameters
+        ----------
+        record_provenance : bool
+            Whether to append a provenance record.
+
+        Returns
+        -------
+        tskit.TreeSequence
+        """
+        from .convert import to_ts as _to_ts
+
+        return _to_ts(self, record_provenance=record_provenance)
+
+    def simplify(self, samples=None, *, individuals=None, record_provenance=True):
+        """
+        Return a new simplified :class:`TreesAssemblage`.
+
+        All tree sequences in the assemblage are simplified simultaneously,
+        maintaining consistent node IDs for shared nodes across contigs.
+
+        Parameters
+        ----------
+        samples : list[int], optional
+            Node IDs to simplify to. These must be globally phased (present
+            in all contigs). If ``None`` and ``individuals`` is also ``None``,
+            defaults to all globally phased sample nodes, which requires that
+            :attr:`is_nonglobal_sample_arg` is ``False``.
+        individuals : list[int], optional
+            If given, simplify to retain the sample nodes belonging to these
+            individual IDs. Each contig is simplified independently to the
+            nodes belonging to the specified individuals, so this works even
+            when nonglobal sample nodes are present. Cannot be combined with
+            ``samples``.
+        record_provenance : bool
+            Whether to record provenance in each simplified tree sequence.
+
+        Returns
+        -------
+        TreesAssemblage
+
+        Raises
+        ------
+        ValueError
+            If both ``samples`` and ``individuals`` are provided.
+            If neither is provided and the assemblage has nonglobal sample
+            nodes (:attr:`is_nonglobal_sample_arg` is ``True``).
+        """
+        if samples is not None and individuals is not None:
+            raise ValueError("Cannot specify both 'samples' and 'individuals'")
+
+        if self.num_contigs == 0:
+            return TreesAssemblage({})
+
+        sorted_keys = self.contigs
+
+        if individuals is None and samples is None:
+            if self.is_nonglobal_sample_arg:
+                raise ValueError(
+                    "Cannot simplify an assemblage with nonglobal sample nodes "
+                    "without specifying 'samples' or 'individuals'. Provide "
+                    "individuals=[...] to select which individuals to retain, or "
+                    "call ta.subset() first to restrict to fully cross-phased contigs."
+                )
+            # Consistent ordering across all contigs: sort globally phased node IDs.
+            # Since there are no nonglobal sample nodes, every sample in every
+            # contig is in global_phased_node_ids.
+            base_samples = sorted(self.global_phased_node_ids)
+
+        if samples is not None:
+            global_phased = self.global_phased_node_ids
+            nonglobal = [s for s in samples if s not in global_phased]
+            if nonglobal:
+                raise ValueError(
+                    f"All node IDs in 'samples' must be globally phased. "
+                    f"Non-global node IDs: {nonglobal}. Use 'individuals=' to "
+                    f"simplify by individual across contigs with nonglobal nodes."
+                )
+
+        new_ts_dict = {}
+        for key in sorted_keys:
+            ts = self[key]
+
+            if individuals is not None:
+                # Collect sample nodes for each individual in a consistent
+                # per-individual order so that node i has the same meaning
+                # across all contigs.
+                sample_set = set(ts.samples())
+                samples_for_contig = []
+                for ind_id in individuals:
+                    ind = ts.individual(ind_id)
+                    samples_for_contig.extend(
+                        n for n in ind.nodes if n in sample_set
+                    )
+            elif samples is not None:
+                # Use provided node IDs, filtered to those present in this contig.
+                sample_set = set(ts.samples())
+                samples_for_contig = [s for s in samples if s in sample_set]
+            else:
+                # Default: globally phased samples, filtered to this contig.
+                sample_set = set(ts.samples())
+                samples_for_contig = [s for s in base_samples if s in sample_set]
+
+            new_ts_dict[key] = ts.simplify(
+                samples=samples_for_contig,
+                record_provenance=record_provenance,
+            )
+
+        return TreesAssemblage(new_ts_dict)
 
 
 # ------------------------------------------------------------------

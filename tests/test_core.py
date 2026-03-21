@@ -6,7 +6,7 @@ import pytest
 import tskit
 
 import tskit_multichrom as tmc
-from tests.conftest import make_ts, make_two_contig_archive
+from tests.conftest import make_ts, make_two_contig_archive, make_autosomes_plus_x_archive
 
 
 class TestContigKey:
@@ -166,13 +166,13 @@ class TestCaching:
         ta = make_two_contig_archive(mark_shared=False)
         assert len(ta.global_phased_node_ids) == 0
 
-    def test_not_partial_sample_arg_when_shared(self):
+    def test_not_nonglobal_sample_arg_when_shared(self):
         ta = make_two_contig_archive(mark_shared=True)
-        assert not ta.is_partial_sample_arg
+        assert not ta.is_nonglobal_sample_arg
 
-    def test_is_partial_sample_arg_when_not_shared(self):
+    def test_is_nonglobal_sample_arg_when_not_shared(self):
         ta = make_two_contig_archive(mark_shared=False)
-        assert ta.is_partial_sample_arg
+        assert ta.is_nonglobal_sample_arg
 
     def test_nonglobal_sample_count(self):
         ta = make_two_contig_archive(mark_shared=False)
@@ -323,3 +323,77 @@ class TestReindex:
         assert meta0["index"] == 0
         meta1 = ta2.contig("chr1").metadata["contig"]
         assert meta1["index"] == 1
+
+
+class TestSimplify:
+    def test_simplify_reduces_nodes(self):
+        ta = make_two_contig_archive(mark_shared=True)
+        ta2 = ta.simplify()
+        # Ancestral nodes should be simplified away (star topology → one root)
+        for ts in ta2.values():
+            assert ts.num_nodes <= ta.contig("chr1").num_nodes
+
+    def test_simplify_preserves_num_samples(self):
+        ta = make_two_contig_archive(mark_shared=True, num_samples=4)
+        ta2 = ta.simplify()
+        for ts in ta2.values():
+            assert ts.num_samples == 4
+
+    def test_simplify_preserves_is_shared_flags(self):
+        ta = make_two_contig_archive(mark_shared=True)
+        ta2 = ta.simplify()
+        assert not ta2.is_nonglobal_sample_arg
+        # All sample nodes should still have IS_SHARED set after simplify
+        ts = ta2.contig("chr1")
+        for s in ts.samples():
+            assert ts.node(s).flags & tmc.NODE_IS_SHARED
+
+    def test_simplify_consistent_sample_ids_across_contigs(self):
+        ta = make_two_contig_archive(mark_shared=True, num_samples=4)
+        ta2 = ta.simplify()
+        # Sample node IDs must be the same in both contigs
+        samples_chr1 = set(ta2.contig("chr1").samples())
+        samples_chr2 = set(ta2.contig("chr2").samples())
+        assert samples_chr1 == samples_chr2
+
+    def test_simplify_fails_with_nonglobal_samples(self):
+        ta = make_two_contig_archive(mark_shared=False)
+        with pytest.raises(ValueError, match="nonglobal"):
+            ta.simplify()
+
+    def test_simplify_empty_assemblage(self):
+        ta = tmc.TreesAssemblage({})
+        ta2 = ta.simplify()
+        assert ta2.num_contigs == 0
+
+    def test_simplify_by_samples(self):
+        ta = make_two_contig_archive(mark_shared=True, num_samples=4)
+        global_samples = sorted(ta.global_phased_node_ids & set(ta.contig("chr1").samples()))
+        ta2 = ta.simplify(samples=global_samples[:2])
+        for ts in ta2.values():
+            assert ts.num_samples == 2
+
+    def test_simplify_by_individuals(self):
+        # Simplify to a subset of individuals, works even without cross-phasing
+        ta = make_two_contig_archive(mark_shared=True, num_samples=4)
+        ta2 = ta.simplify(individuals=[0, 1])  # keep 2 out of 2 individuals
+        for ts in ta2.values():
+            assert ts.num_samples == 4  # 2 individuals × 2 haplotypes
+
+    def test_simplify_by_individuals_subset(self):
+        ta = make_two_contig_archive(mark_shared=True, num_samples=4)
+        ta2 = ta.simplify(individuals=[0])  # keep 1 out of 2 individuals
+        for ts in ta2.values():
+            assert ts.num_samples == 2  # 1 individual × 2 haplotypes
+
+    def test_simplify_by_individuals_on_partial_arg(self):
+        # Can simplify a partial-sample ARG using individuals=
+        ta = make_autosomes_plus_x_archive(num_samples=4)
+        assert ta.is_nonglobal_sample_arg
+        ta2 = ta.simplify(individuals=[0])
+        assert ta2.num_contigs == 3
+
+    def test_simplify_samples_and_individuals_raises(self):
+        ta = make_two_contig_archive(mark_shared=True)
+        with pytest.raises(ValueError, match="both"):
+            ta.simplify(samples=[0, 1], individuals=[0])

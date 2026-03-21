@@ -56,7 +56,7 @@ class TestDiversity:
         ta = _add_mutations_to_archive(ta)
 
         default_sample_sets = [sorted(ta.global_phased_node_ids)]
-        expected = tmc.to_ts(ta).diversity(sample_sets=default_sample_sets, mode=mode)
+        expected = ta.to_ts().diversity(sample_sets=default_sample_sets, mode=mode)
         actual = ta.stats.diversity(mode=mode)
 
         assert actual == pytest.approx(expected)
@@ -65,14 +65,14 @@ class TestDiversity:
     def test_diversity_matches_to_ts_sample_sets(self):
         ta = _make_two_contig_archive_shared_samples_only()
         sample_sets = [[0, 1], [2, 3]]
-        expected = tmc.to_ts(ta).diversity(sample_sets=sample_sets)
+        expected = ta.to_ts().diversity(sample_sets=sample_sets)
         actual = ta.stats.diversity(sample_sets=sample_sets)
         assert actual == pytest.approx(expected)
 
     def test_diversity_matches_to_ts_span_normalise_false(self):
         ta = _make_two_contig_archive_shared_samples_only()
         sample_sets = [sorted(ta.global_phased_node_ids)]
-        expected = tmc.to_ts(ta).diversity(
+        expected = ta.to_ts().diversity(
             sample_sets=sample_sets,
             span_normalise=False,
         )
@@ -114,3 +114,23 @@ class TestDiversity:
         ta_auto = ta.subset(type="A")
         value = ta_auto.stats.diversity()
         assert value is not None
+
+    def test_diversity_mixed_shared_samples_then_simplify_matches(self):
+        # Mixed-sample assemblage: some sample IDs are globally shared,
+        # others are not (partial-sample ARG across contigs).
+        ta = make_autosomes_plus_x_archive()
+        ta = _add_mutations_to_archive(ta)
+
+        with pytest.raises(ValueError, match="sample_sets must be provided"):
+            ta.stats.diversity()
+
+        shared_samples = sorted(
+            s for s in ta.global_phased_node_ids if ta.contig("chr1").node(s).is_sample()
+        )
+        explicit_value = ta.stats.diversity(sample_sets=[shared_samples])
+
+        ta_shared = ta.simplify(samples=shared_samples)
+        assert not ta_shared.is_nonglobal_sample_arg
+        simplified_value = ta_shared.stats.diversity()
+
+        assert simplified_value == pytest.approx(explicit_value)
