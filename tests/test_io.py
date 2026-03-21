@@ -85,7 +85,7 @@ class TestDumpLoadZip:
         try:
             with zipfile.ZipFile(path, "w"):
                 pass
-            with pytest.raises(ValueError, match="No .trees files"):
+            with pytest.raises(ValueError, match="No .trees or .tsz files"):
                 tmc.load(path)
         finally:
             os.unlink(path)

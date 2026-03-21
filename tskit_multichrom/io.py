@@ -13,7 +13,7 @@ A trees archive can be stored in two formats:
    helpers if you want to reduce file size.
 
 In both cases each ``.trees`` file must carry a top-level ``'contig'`` metadata
-key (see :func:`~tskit_multichrom.core.make_permissive_contig_schema`).
+key (see :class:`tskit.MetadataSchema.permissive_json`).
 """
 
 import os
@@ -22,6 +22,7 @@ import tempfile
 import zipfile
 
 import tskit
+import tszip
 
 from .core import ContigKey, TreesAssemblage, make_contig_key
 from .flags import CONTIG_METADATA_KEY
@@ -34,11 +35,6 @@ from .flags import CONTIG_METADATA_KEY
 
 def _load_tree_sequences_from_dir(path):
     """Load all .trees (or .tsz) files from a directory and return {key: ts}."""
-    try:
-        import tszip as _tszip
-    except ImportError:
-        _tszip = None
-
     tree_sequences = {}
     entries = sorted(os.listdir(path))
     found = [
@@ -50,11 +46,7 @@ def _load_tree_sequences_from_dir(path):
     for name in found:
         fpath = os.path.join(path, name)
         if name.endswith(".tsz"):
-            if _tszip is None:
-                raise ImportError(
-                    f"tszip is required to load compressed files (.tsz): {fpath}"
-                )
-            ts = _tszip.load(fpath)
+            ts = tszip.load(fpath)
         else:
             ts = tskit.load(fpath)
 
@@ -74,19 +66,25 @@ def _load_tree_sequences_from_dir(path):
 
 
 def _load_tree_sequences_from_zip(path):
-    """Load all .trees files from a zip archive and return {key: ts}."""
+    """Load all .trees (or .tsz) files from a zip archive and return {key: ts}."""
     tree_sequences = {}
     with zipfile.ZipFile(path, "r") as zf:
-        names = [n for n in zf.namelist() if n.endswith(".trees")]
+        names = [
+            n for n in zf.namelist()
+            if n.endswith(".trees") or n.endswith(".tsz")
+        ]
         if not names:
-            raise ValueError(f"No .trees files found in {path!r}")
+            raise ValueError(f"No .trees or .tsz files found in {path!r}")
 
         with tempfile.TemporaryDirectory() as tmpdir:
             for name in names:
                 dest = os.path.join(tmpdir, os.path.basename(name))
                 with zf.open(name) as src, open(dest, "wb") as dst:
                     shutil.copyfileobj(src, dst)
-                ts = tskit.load(dest)
+                if name.endswith(".tsz"):
+                    ts = tszip.load(dest)
+                else:
+                    ts = tskit.load(dest)
 
                 meta = ts.metadata
                 if not isinstance(meta, dict) or CONTIG_METADATA_KEY not in meta:
@@ -166,15 +164,6 @@ def dump(assemblage, path, *, compress=False):
         If True, compress each tree sequence with tszip (produces ``.tsz`` files).
         Requires the ``tszip`` package.
     """
-    if compress:
-        try:
-            import tszip as _tszip
-        except ImportError as exc:
-            raise ImportError(
-                "tszip is required for compressed output. "
-                "Install it with: pip install tszip"
-            ) from exc
-
     path = str(path)
     path_lower = path.lower()
     is_zip = path_lower.endswith(".zip") or path_lower.endswith("_trees.zip")
@@ -187,15 +176,12 @@ def dump(assemblage, path, *, compress=False):
 
 def _dump_dir(assemblage, path, *, compress=False):
     """Write a trees archive to a directory."""
-    if compress:
-        import tszip as _tszip
-
     os.makedirs(path, exist_ok=True)
     for key in assemblage.contigs:
         ts = assemblage[key]
         if compress:
             dest = os.path.join(path, f"{key.symbol}.tsz")
-            _tszip.compress(ts, dest)
+            tszip.compress(ts, dest)
         else:
             dest = os.path.join(path, f"{key.symbol}.trees")
             ts.dump(dest)
@@ -203,16 +189,13 @@ def _dump_dir(assemblage, path, *, compress=False):
 
 def _dump_zip(assemblage, path, *, compress=False):
     """Write a trees archive to an uncompressed zip file."""
-    if compress:
-        import tszip as _tszip
-
     with tempfile.TemporaryDirectory() as tmpdir:
         with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_STORED) as zf:
             for key in assemblage.contigs:
                 ts = assemblage[key]
                 if compress:
                     tmp_path = os.path.join(tmpdir, f"{key.symbol}.tsz")
-                    _tszip.compress(ts, tmp_path)
+                    tszip.compress(ts, tmp_path)
                     zf.write(tmp_path, arcname=f"{key.symbol}.tsz")
                 else:
                     tmp_path = os.path.join(tmpdir, f"{key.symbol}.trees")

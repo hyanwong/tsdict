@@ -49,6 +49,16 @@ class TestTreesAssemblageConstruction:
 
 
 class TestValidation:
+    def test_static_validate_accepts_mapping(self):
+        ts1 = make_ts(contig_meta={"index": 0, "id": 0, "symbol": "c1", "type": "A"})
+        ts2 = make_ts(contig_meta={"index": 1, "id": 1, "symbol": "c2", "type": "A"})
+        tmc.TreesAssemblage.validate(
+            {
+                tmc.ContigKey(0, 0, "c1", "A"): ts1,
+                tmc.ContigKey(1, 1, "c2", "A"): ts2,
+            }
+        )
+
     def test_duplicate_index(self):
         ts1 = make_ts(contig_meta={"index": 0, "id": 0, "symbol": "c1", "type": "A"})
         ts2 = make_ts(contig_meta={"index": 0, "id": 1, "symbol": "c2", "type": "A"})
@@ -139,14 +149,22 @@ class TestCaching:
         ta = make_two_contig_archive()
         assert ta.total_sequence_length == 1000 + 2000
 
-    def test_cross_phased_nodes(self):
+    def test_shared_nodes(self):
         ta = make_two_contig_archive(mark_shared=True)
-        # All nodes have IS_SHARED set, so all should be cross-phased
-        assert len(ta.cross_phased_node_ids) == 5  # 4 samples + 1 ancestral
+        assert len(ta.shared_node_ids) == 5  # 4 samples + 1 ancestral
 
-    def test_no_cross_phased_nodes(self):
+    def test_no_shared_nodes(self):
         ta = make_two_contig_archive(mark_shared=False)
-        assert len(ta.cross_phased_node_ids) == 0
+        assert len(ta.shared_node_ids) == 0
+
+    def test_global_phased_nodes(self):
+        ta = make_two_contig_archive(mark_shared=True)
+        # All nodes have IS_SHARED set, so all should be globally phased
+        assert len(ta.global_phased_node_ids) == 5  # 4 samples + 1 ancestral
+
+    def test_no_global_phased_nodes(self):
+        ta = make_two_contig_archive(mark_shared=False)
+        assert len(ta.global_phased_node_ids) == 0
 
     def test_not_partial_sample_arg_when_shared(self):
         ta = make_two_contig_archive(mark_shared=True)

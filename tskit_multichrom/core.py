@@ -4,6 +4,7 @@ Core TreesAssemblage class for tskit_multichrom.
 
 import collections
 
+import numpy as np
 import tskit
 
 from .flags import CONTIG_METADATA_KEY, NODE_IS_SHARED
@@ -27,7 +28,7 @@ class TreesAssemblage:
     :meth:`contig` method.
 
     The assemblage enforces a set of consistency requirements across the
-    constituent tree sequences (see :meth:`_validate`).
+    constituent tree sequences (see :meth:`validate`).
 
     Parameters
     ----------
@@ -38,6 +39,22 @@ class TreesAssemblage:
     """
 
     def __init__(self, tree_sequences, *, skip_validation=False):
+        if skip_validation:
+            self._check_tree_sequence_mapping(tree_sequences)
+        else:
+            self.validate(tree_sequences)
+        self._tree_sequences = dict(
+            sorted(tree_sequences.items(), key=lambda item: item[0].index)
+        )
+        self._build_cache()
+
+    # ------------------------------------------------------------------
+    # Validation
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _check_tree_sequence_mapping(tree_sequences):
+        """Check that tree_sequences is a dict[ContigKey, tskit.TreeSequence]."""
         if not isinstance(tree_sequences, dict):
             raise TypeError("tree_sequences must be a dict")
         for key, ts in tree_sequences.items():
@@ -47,22 +64,21 @@ class TreesAssemblage:
                 raise TypeError(
                     f"Values must be tskit.TreeSequence instances, got {type(ts)}"
                 )
-        self._tree_sequences = dict(tree_sequences)
-        if not skip_validation:
-            self._validate()
-        self._build_cache()
 
-    # ------------------------------------------------------------------
-    # Validation
-    # ------------------------------------------------------------------
-
-    def _validate(self):
-        """Validate consistency requirements across all tree sequences."""
-        if len(self._tree_sequences) == 0:
+    @staticmethod
+    def validate(tree_sequences):
+        """
+        Validate consistency requirements across a dict of tree sequences.
+        The dict does not need to be in any particular order,
+        but the keys must be ContigKey instances and
+        the values must be tskit.TreeSequence instances.
+        """
+        TreesAssemblage._check_tree_sequence_mapping(tree_sequences)
+        if len(tree_sequences) == 0:
             return
 
-        keys = list(self._tree_sequences.keys())
-        tss = list(self._tree_sequences.values())
+        keys = list(tree_sequences.keys())
+        tss = list(tree_sequences.values())
 
         # Keys: index and id must be unique; (index, id, symbol) must be unique
         indexes = [k.index for k in keys]
@@ -88,8 +104,8 @@ class TreesAssemblage:
                 )
 
         # Check ContigKey matches top-level metadata of each tree sequence
-        for key, ts in self._tree_sequences.items():
-            self._check_contig_metadata(key, ts)
+        for key, ts in tree_sequences.items():
+            TreesAssemblage._check_contig_metadata(key, ts)
 
         # Reference tree sequence (first in index order)
         ref_ts = tss[0]
@@ -111,7 +127,7 @@ class TreesAssemblage:
                 )
 
         # Migration tables must be empty
-        for key, ts in self._tree_sequences.items():
+        for key, ts in tree_sequences.items():
             if ts.num_migrations > 0:
                 raise ValueError(
                     f"Migration tables must be empty; contig {key.symbol!r} has "
@@ -128,7 +144,7 @@ class TreesAssemblage:
 
         # Node metadata schemas must be identical
         ref_node_schema = ref_ts.tables.nodes.metadata_schema
-        for key, ts in self._tree_sequences.items():
+        for key, ts in tree_sequences.items():
             if ts.tables.nodes.metadata_schema != ref_node_schema:
                 raise ValueError(
                     f"Node metadata schemas must be identical across all contigs; "
@@ -138,7 +154,7 @@ class TreesAssemblage:
         # Check IS_SHARED node identity: any node with IS_SHARED set must be
         # identical (flags, time, individual, population, metadata) across all
         # tree sequences that contain that node ID.
-        self._validate_shared_nodes()
+        TreesAssemblage._validate_shared_nodes(tree_sequences)
 
     @staticmethod
     def _check_contig_metadata(key, ts):
@@ -176,7 +192,8 @@ class TreesAssemblage:
                 f"'type' ({contig_meta['type']!r})"
             )
 
-    def _validate_shared_nodes(self):
+    @staticmethod
+    def _validate_shared_nodes(tree_sequences):
         """
         Validate IS_SHARED node identity requirements.
 
@@ -187,22 +204,22 @@ class TreesAssemblage:
         # Collect all shared node IDs and their representative rows
         shared_nodes = {}  # node_id -> (representative_row, contig_symbol)
 
-        for key, ts in self._tree_sequences.items():
+        for key, ts in tree_sequences.items():
             nodes = ts.tables.nodes
-            for node_id in range(ts.num_nodes):
+            shared_ids = np.flatnonzero((nodes.flags & NODE_IS_SHARED) != 0)
+            for node_id in shared_ids:
                 row = nodes[node_id]
-                if row.flags & NODE_IS_SHARED:
-                    if node_id in shared_nodes:
-                        ref_row, ref_symbol = shared_nodes[node_id]
-                        # Must be identical
-                        if not _node_rows_equal(ref_row, row):
-                            raise ValueError(
-                                f"Node {node_id} has IS_SHARED flag set but differs "
-                                f"between contig {ref_symbol!r} and {key.symbol!r}: "
-                                f"{ref_row} vs {row}"
-                            )
-                    else:
-                        shared_nodes[node_id] = (row, key.symbol)
+                if node_id in shared_nodes:
+                    ref_row, ref_symbol = shared_nodes[node_id]
+                    # Must be identical
+                    if not _node_rows_equal(ref_row, row):
+                        raise ValueError(
+                            f"Node {node_id} has IS_SHARED flag set but differs "
+                            f"between contig {ref_symbol!r} and {key.symbol!r}: "
+                            f"{ref_row} vs {row}"
+                        )
+                else:
+                    shared_nodes[node_id] = (row, key.symbol)
 
     # ------------------------------------------------------------------
     # Caching
@@ -212,28 +229,26 @@ class TreesAssemblage:
         """Build the internal cache for the assemblage."""
         self._cache = {}
 
-        # Sort keys by index
-        sorted_keys = sorted(self._tree_sequences.keys(), key=lambda k: k.index)
-        self._sorted_keys = sorted_keys
-
-        # Total sequence length (sum of all contig lengths)
-        total_length = sum(
+        self._cache["total_sequence_length"] = sum(
             ts.sequence_length for ts in self._tree_sequences.values()
         )
-        self._cache["total_sequence_length"] = total_length
 
-        # Cross-phased node IDs: nodes with IS_SHARED flag in ALL tree sequences
-        # that contain that node ID
-        self._cache["cross_phased_node_ids"] = self._compute_cross_phased_nodes()
+        # Shared node IDs: nodes with IS_SHARED flag in at least one contig.
+        self._cache["shared_node_ids"] = self._compute_shared_node_ids()
 
-        # Count nonglobal sample nodes: sample nodes that are NOT cross-phased
+        # Global phased node IDs: nodes with IS_SHARED flag in ALL tree
+        # sequences that contain that node ID
+        self._cache["global_phased_node_ids"] = self._compute_global_phased_nodes()
+
+        # Count nonglobal sample nodes: sample nodes that are NOT globally phased
         # in at least one contig
-        all_sample_ids = set()
-        for ts in self._tree_sequences.values():
-            for s in ts.samples():
-                all_sample_ids.add(s)
-        cross_phased = self._cache["cross_phased_node_ids"]
-        nonglobal = all_sample_ids - cross_phased
+        sample_arrays = [ts.samples() for ts in self._tree_sequences.values()]
+        if sample_arrays:
+            all_sample_ids = set(np.unique(np.concatenate(sample_arrays)))
+        else:
+            all_sample_ids = set()
+        global_phased = self._cache["global_phased_node_ids"]
+        nonglobal = all_sample_ids - global_phased
         self._cache["nonglobal_sample_node_count"] = len(nonglobal)
         self._cache["is_partial_sample_arg"] = len(nonglobal) > 0
 
@@ -241,49 +256,48 @@ class TreesAssemblage:
         self._by_id = {k.id: k for k in self._tree_sequences}
         self._by_symbol = {k.symbol: k for k in self._tree_sequences}
 
-    def _compute_cross_phased_nodes(self):
+    def _compute_shared_node_ids(self):
+        """Return node IDs that have IS_SHARED set in at least one contig."""
+        shared_node_ids = set()
+        for ts in self._tree_sequences.values():
+            flags = ts.tables.nodes.flags
+            shared_node_ids.update(np.flatnonzero((flags & NODE_IS_SHARED) != 0))
+        return shared_node_ids
+
+    def _compute_global_phased_nodes(self):
         """
         Return a set of node IDs that have IS_SHARED flag set in every tree
         sequence that contains them.
 
-        A node ID is considered "cross-phased" if:
+        A node ID is considered "globally phased" if:
         - It exists in at least one tree sequence, AND
         - In every tree sequence that contains it, it has the IS_SHARED flag set.
         """
         if not self._tree_sequences:
             return set()
 
-        # node_id -> count of TS where it appears with IS_SHARED set
-        shared_count = {}
-        # node_id -> count of TS where it appears (at all)
-        total_count = {}
+        max_nodes = max(ts.num_nodes for ts in self._tree_sequences.values())
+        total_count = np.zeros(max_nodes, dtype=np.int32)
+        shared_count = np.zeros(max_nodes, dtype=np.int32)
 
         for ts in self._tree_sequences.values():
-            for node_id in range(ts.num_nodes):
-                total_count[node_id] = total_count.get(node_id, 0) + 1
-                if ts.tables.nodes[node_id].flags & NODE_IS_SHARED:
-                    shared_count[node_id] = shared_count.get(node_id, 0) + 1
+            n = ts.num_nodes
+            total_count[:n] += 1
+            shared_ids = np.flatnonzero((ts.tables.nodes.flags & NODE_IS_SHARED) != 0)
+            shared_count[shared_ids] += 1
 
-        # A node is cross-phased if shared_count == total_count for that node
-        return {
-            nid
-            for nid, cnt in total_count.items()
-            if shared_count.get(nid, 0) == cnt
-        }
+        # A node is globally phased if shared_count == total_count for that node.
+        globally_phased = (total_count > 0) & (shared_count == total_count)
+        return set(np.flatnonzero(globally_phased))
 
     # ------------------------------------------------------------------
     # Properties
     # ------------------------------------------------------------------
 
     @property
-    def tree_sequences(self):
-        """dict[ContigKey, tskit.TreeSequence]: The underlying tree sequences."""
-        return dict(self._tree_sequences)
-
-    @property
     def contigs(self):
-        """list[ContigKey]: Contig keys sorted by index. Equivalent to ta.keys()."""
-        return list(self._sorted_keys)
+        """list[ContigKey]: Contig keys sorted by index. Equivalent to list(ta.keys())."""
+        return list(self.keys())
 
     @property
     def total_sequence_length(self):
@@ -291,9 +305,19 @@ class TreesAssemblage:
         return self._cache["total_sequence_length"]
 
     @property
+    def global_phased_node_ids(self):
+        """set[int]: Node IDs that are shared (globally phased) in all contigs."""
+        return set(self._cache["global_phased_node_ids"])
+
+    @property
+    def shared_node_ids(self):
+        """set[int]: Node IDs with IS_SHARED set in at least one contig."""
+        return set(self._cache["shared_node_ids"])
+
+    @property
     def cross_phased_node_ids(self):
-        """set[int]: Node IDs that are shared (cross-phased) in all contigs."""
-        return set(self._cache["cross_phased_node_ids"])
+        """set[int]: Alias for global_phased_node_ids (backward compatibility)."""
+        return self.global_phased_node_ids
 
     @property
     def nonglobal_sample_node_count(self):
@@ -316,15 +340,27 @@ class TreesAssemblage:
 
     def keys(self):
         """Return ContigKeys sorted by index (like dict.keys(), but as a list)."""
-        return list(self._sorted_keys)
+        return self._tree_sequences.keys()
 
     def values(self):
         """Return tree sequences sorted by contig index (like dict.values(), but as a list)."""
-        return [self._tree_sequences[k] for k in self._sorted_keys]
+        return self._tree_sequences.values()
 
     def items(self):
         """Return (ContigKey, TreeSequence) pairs sorted by index (like dict.items(), but as a list)."""
-        return [(k, self._tree_sequences[k]) for k in self._sorted_keys]
+        return self._tree_sequences.items()
+
+    def __iter__(self):
+        """Iterate over ContigKeys in index order."""
+        return iter(self._tree_sequences.keys())
+
+    def __len__(self):
+        return len(self._tree_sequences)
+
+    def __getitem__(self, key):
+        """Return the tree sequence for a ContigKey."""
+        return self._tree_sequences[key]
+
     # ------------------------------------------------------------------
     # Contig access
     # ------------------------------------------------------------------
@@ -354,30 +390,21 @@ class TreesAssemblage:
                 )
             return self._tree_sequences[self._by_symbol[id_or_symbol]]
 
-        # Integer lookup: try id first, then index
-        if id_or_symbol in self._by_id:
+        # Integer lookup: try id first, then symbol
+        try:
             return self._tree_sequences[self._by_id[id_or_symbol]]
-        for key in self._tree_sequences:
-            if key.index == id_or_symbol:
-                return self._tree_sequences[key]
-        raise KeyError(
-            f"No contig with id or index {id_or_symbol!r}. "
-            f"Available ids: {list(self._by_id)}"
-        )
+        except KeyError:
+            try:
+                return self._tree_sequences[self._by_symbol[id_or_symbol]]
+            except KeyError as e:
+                raise KeyError(
+                    f"No contig with id or symbol {id_or_symbol!r}. "
+                    f"Available symbols: {list(self._by_symbol)}"
+                ) from e
 
-    def __len__(self):
-        return len(self._tree_sequences)
-
-    def __iter__(self):
-        """Iterate over ContigKeys in index order."""
-        return iter(self._sorted_keys)
-
-    def __getitem__(self, key):
-        """Return the tree sequence for a ContigKey."""
-        return self._tree_sequences[key]
 
     def __repr__(self):
-        symbols = [k.symbol for k in self._sorted_keys]
+        symbols = [k.symbol for k in self._tree_sequences.keys()]
         return (
             f"TreesAssemblage(contigs={symbols!r}, "
             f"total_length={self.total_sequence_length})"
@@ -458,7 +485,7 @@ class TreesAssemblage:
         TreesAssemblage
         """
         if order is None:
-            ordered_keys = self._sorted_keys
+            ordered_keys = list(self._tree_sequences.keys())
         else:
             ordered_keys = []
             for item in order:
@@ -558,15 +585,4 @@ def make_contig_key(contig_meta):
     )
 
 
-def make_permissive_contig_schema():
-    """
-    Return a permissive :class:`tskit.MetadataSchema` suitable for contig
-    top-level metadata.
 
-    Uses :meth:`tskit.MetadataSchema.permissive_json` as the base schema so
-    that any additional top-level keys are tolerated. The presence of the
-    required ``'contig'`` key is validated separately when a
-    :class:`TreesAssemblage` is constructed (see
-    :meth:`TreesAssemblage._check_contig_metadata`).
-    """
-    return tskit.MetadataSchema.permissive_json()

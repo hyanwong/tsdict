@@ -32,18 +32,17 @@ from .core import (
     ContigKey,
     TreesAssemblage,
     make_contig_key,
-    make_permissive_contig_schema,
 )
 from .convert import from_slim, from_ts, to_ts
 from .flags import ARCHIVE_EXTENSION, CONTIG_METADATA_KEY, NODE_IS_SHARED
 from .io import dump, load
+from ._version import tskit_multichrom_version as __version__
 
 __all__ = [
     # Core
     "TreesAssemblage",
     "ContigKey",
     "make_contig_key",
-    "make_permissive_contig_schema",
     # I/O
     "load",
     "dump",
@@ -57,4 +56,3 @@ __all__ = [
     "ARCHIVE_EXTENSION",
 ]
 
-__version__ = "0.1.0"
