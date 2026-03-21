@@ -24,6 +24,15 @@ CONTIG_SCHEMA = {
     "additionalProperties": True,
 }
 
+NODE_SCHEMA = {
+    "codec": "json",
+    "type": "object",
+    "properties": {
+        "is_vacant": {"type": "integer"},
+    },
+    "additionalProperties": True,
+}
+
 
 def make_ts(
     seq_len=1000,
@@ -45,6 +54,7 @@ def make_ts(
     num_individuals = num_samples // 2
 
     tables = tskit.TableCollection(sequence_length=seq_len)
+    tables.nodes.metadata_schema = tskit.MetadataSchema(NODE_SCHEMA)
     tables.populations.add_row()
 
     for _ in range(num_individuals):
@@ -56,15 +66,28 @@ def make_ts(
 
     for ind_id in range(num_individuals):
         tables.nodes.add_row(
-            flags=node_flags, time=0, population=0, individual=ind_id
+            flags=node_flags,
+            time=0,
+            population=0,
+            individual=ind_id,
+            metadata={"is_vacant": 0},
         )
         tables.nodes.add_row(
-            flags=node_flags, time=0, population=0, individual=ind_id
+            flags=node_flags,
+            time=0,
+            population=0,
+            individual=ind_id,
+            metadata={"is_vacant": 0},
         )
 
     # One ancestral node (not a sample, but shared too)
     anc_flags = tmc.NODE_IS_SHARED if mark_shared else 0
-    tables.nodes.add_row(flags=anc_flags, time=1.0, population=0)
+    tables.nodes.add_row(
+        flags=anc_flags,
+        time=1.0,
+        population=0,
+        metadata={"is_vacant": 0},
+    )
     anc_id = num_samples
 
     for sample_id in range(num_samples):

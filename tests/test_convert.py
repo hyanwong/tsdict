@@ -2,6 +2,8 @@
 Tests for conversion between TreesAssemblage and a single TreeSequence.
 """
 
+import json
+
 import pytest
 import tskit
 
@@ -19,12 +21,12 @@ class TestToTreeSequence:
     def test_metadata_present(self):
         ta = make_two_contig_archive()
         ts = tmc.to_ts(ta)
-        assert "tskit_multichrom_contigs" in ts.metadata
+        assert "contigs" in ts.metadata
 
     def test_contigs_in_metadata(self):
         ta = make_two_contig_archive()
         ts = tmc.to_ts(ta)
-        meta = ts.metadata["tskit_multichrom_contigs"]
+        meta = ts.metadata["contigs"]
         assert len(meta) == 2
         symbols = [c["contig"]["symbol"] for c in meta]
         assert "chr1" in symbols
@@ -73,6 +75,24 @@ class TestToTreeSequence:
         ta = make_two_contig_archive()
         ts = tmc.to_ts(ta)
         assert ts.sequence_length == 3000  # 1000 + 2000
+
+    def test_record_provenance_false(self):
+        ta = make_two_contig_archive()
+        ts = tmc.to_ts(ta, record_provenance=False)
+        assert ts.num_provenances == ta.contig("chr1").num_provenances
+
+    def test_record_provenance_true_adds_entry(self):
+        ta = make_two_contig_archive()
+        ref_count = ta.contig("chr1").num_provenances
+        ts = tmc.to_ts(ta, record_provenance=True)
+        assert ts.num_provenances == ref_count + 1
+
+    def test_record_provenance_true_entry_has_version(self):
+        ta = make_two_contig_archive()
+        ts = tmc.to_ts(ta, record_provenance=True)
+        record = json.loads(ts.tables.provenances[-1].record)
+        assert record["software"]["name"] == "tskit_multichrom"
+        assert record["software"]["version"] == tmc.__version__
 
     def test_sites_are_shifted(self):
         """Sites from chr2 should be shifted by chr1's sequence_length."""
@@ -127,6 +147,34 @@ class TestFromTreeSequence:
         assert meta["symbol"] == "chr1"
         assert meta["index"] == 0
 
+    def test_record_provenance_kwarg(self):
+        ta = make_two_contig_archive()
+        ts = tmc.to_ts(ta)
+        ta2 = tmc.from_ts(ts, record_provenance=False)
+        assert ta2.num_contigs == 2
+
+    def test_from_ts_record_provenance_false(self):
+        ta = make_two_contig_archive()
+        ts = tmc.to_ts(ta, record_provenance=False)
+        ta2 = tmc.from_ts(ts, record_provenance=False)
+        assert ta2.contig("chr1").num_provenances == 0
+        assert ta2.contig("chr2").num_provenances == 0
+
+    def test_from_ts_record_provenance_true(self):
+        ta = make_two_contig_archive()
+        ts = tmc.to_ts(ta, record_provenance=False)
+        ta2 = tmc.from_ts(ts, record_provenance=True)
+        assert ta2.contig("chr1").num_provenances == 1
+        assert ta2.contig("chr2").num_provenances == 1
+
+    def test_from_ts_record_provenance_true_entry_has_version(self):
+        ta = make_two_contig_archive()
+        ts = tmc.to_ts(ta, record_provenance=False)
+        ta2 = tmc.from_ts(ts, record_provenance=True)
+        record = json.loads(ta2.contig("chr1").tables.provenances[-1].record)
+        assert record["software"]["name"] == "tskit_multichrom"
+        assert record["software"]["version"] == tmc.__version__
+
     def test_no_archive_metadata_raises(self):
         tables = tskit.TableCollection(sequence_length=1000)
         tables.metadata_schema = tskit.MetadataSchema(
@@ -134,7 +182,7 @@ class TestFromTreeSequence:
         )
         tables.metadata = {}
         ts = tables.tree_sequence()
-        with pytest.raises(ValueError, match="tskit_multichrom_contigs"):
+        with pytest.raises(ValueError, match="contigs"):
             tmc.from_ts(ts)
 
 

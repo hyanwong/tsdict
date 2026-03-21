@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tskit_multichrom"
-version = "0.1.0"
+dynamic = ["version"]
 description = "A wrapper on top of tskit for storing and analysing multiple chromosomes"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -25,6 +25,9 @@ dev = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["tskit_multichrom*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "tskit_multichrom._version.tskit_multichrom_version"}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -17,19 +17,20 @@ are implicitly shared) into a :class:`TreesAssemblage`.
 """
 
 import warnings
+import json
 
 import numpy as np
 import tskit
 
-from .core import ContigKey, TreesAssemblage, make_contig_key, make_permissive_contig_schema
+from ._version import tskit_multichrom_version
+from .core import TreesAssemblage, make_contig_key
 from .flags import CONTIG_METADATA_KEY, NODE_IS_SHARED
 
 # Top-level metadata key used in the single-TS representation
-_ARCHIVE_META_KEY = "tskit_multichrom_contigs"
-_NULL = tskit.NULL  # -1
+_ARCHIVE_META_KEY = "contigs"
 
 
-def to_ts(assemblage, record_provenance=True):
+def to_ts(ta, record_provenance=True):
     """
     Merge a :class:`TreesAssemblage` into a single :class:`tskit.TreeSequence`.
 
@@ -43,26 +44,26 @@ def to_ts(assemblage, record_provenance=True):
 
     Parameters
     ----------
-    assemblage : TreesAssemblage
+    ta : TreesAssemblage
     record_provenance : bool
-        Whether to record provenance in the output tree sequence.
+        Whether to append a provenance record for this ``to_ts`` call.
 
     Returns
     -------
     tskit.TreeSequence
     """
-    if assemblage.num_contigs == 0:
+    if ta.num_contigs == 0:
         raise ValueError("Cannot convert an empty archive to a tree sequence")
 
-    sorted_keys = assemblage.contigs  # sorted by index
+    sorted_keys = ta.contigs  # sorted by index
 
     # ------------------------------------------------------------------
     # 1. Validate that site and mutation schemas are identical
     # ------------------------------------------------------------------
-    ref_site_schema = assemblage[sorted_keys[0]].tables.sites.metadata_schema
-    ref_mut_schema = assemblage[sorted_keys[0]].tables.mutations.metadata_schema
+    ref_site_schema = ta[sorted_keys[0]].tables.sites.metadata_schema
+    ref_mut_schema = ta[sorted_keys[0]].tables.mutations.metadata_schema
     for key in sorted_keys[1:]:
-        ts = assemblage[key]
+        ts = ta[key]
         if ts.tables.sites.metadata_schema != ref_site_schema:
             raise ValueError(
                 f"Site metadata schemas differ between contigs: cannot merge. "
@@ -79,13 +80,8 @@ def to_ts(assemblage, record_provenance=True):
     #    Each entry: (node_id, first_chrom_index, vacant_bitflags)
     #    vacant_bitflags: bit i set if the contig with metadata 'index' i is absent
     # ------------------------------------------------------------------
-    # Collect all node IDs that have IS_SHARED in at least one TS
-    shared_node_ids = set()
-    for key in sorted_keys:
-        ts = assemblage[key]
-        for nid in range(ts.num_nodes):
-            if ts.tables.nodes[nid].flags & NODE_IS_SHARED:
-                shared_node_ids.add(nid)
+    # Node IDs with IS_SHARED set in at least one contig.
+    shared_node_ids = ta.shared_node_ids
 
     # For each shared node ID, build vacant_bitflags and find first non-vacant contig
     shared_node_array = []  # list of (node_id, first_contig_key, vacant_bitflags)
@@ -94,7 +90,7 @@ def to_ts(assemblage, record_provenance=True):
         vacant_bitflags = 0
         first_key = None
         for key in sorted_keys:
-            ts = assemblage[key]
+            ts = ta[key]
             if nid < ts.num_nodes and (ts.tables.nodes[nid].flags & NODE_IS_SHARED):
                 if first_key is None:
                     first_key = key
@@ -108,14 +104,14 @@ def to_ts(assemblage, record_provenance=True):
     # ------------------------------------------------------------------
     # 3. Build new TableCollection
     # ------------------------------------------------------------------
-    ref_ts = assemblage[sorted_keys[0]]
-    new_tc = tskit.TableCollection(sequence_length=assemblage.total_sequence_length)
+    ref_ts = ta[sorted_keys[0]]
+    new_tc = tskit.TableCollection(sequence_length=ta.total_sequence_length)
 
     # Copy individual, population tables from reference
     new_tc.individuals.replace_with(ref_ts.tables.individuals)
     new_tc.populations.replace_with(ref_ts.tables.populations)
 
-    # Copy provenance from reference (first in index order)
+    # Always copy provenance from reference (first in index order).
     new_tc.provenances.replace_with(ref_ts.tables.provenances)
 
     # Set metadata schemas
@@ -128,7 +124,7 @@ def to_ts(assemblage, record_provenance=True):
     # ------------------------------------------------------------------
     contigs_meta = []
     for key in sorted_keys:
-        ts = assemblage[key]
+        ts = ta[key]
         entry = {
             "sequence_length": ts.sequence_length,
             "num_nodes": ts.num_nodes,
@@ -144,6 +140,19 @@ def to_ts(assemblage, record_provenance=True):
     new_tc.metadata_schema = tskit.MetadataSchema(permissive_schema)
     new_tc.metadata = {_ARCHIVE_META_KEY: contigs_meta}
 
+    if record_provenance:
+        provenance_record = {
+            "software": {
+                "name": "tskit_multichrom",
+                "version": tskit_multichrom_version,
+            },
+            "parameters": {
+                "command": "to_ts",
+                "num_contigs": len(sorted_keys),
+            },
+        }
+        new_tc.provenances.add_row(record=json.dumps(provenance_record))
+
     # ------------------------------------------------------------------
     # 5. Iterate through contigs and build node/edge/site/mutation tables
     # ------------------------------------------------------------------
@@ -154,8 +163,8 @@ def to_ts(assemblage, record_provenance=True):
     all_node_maps = []
 
     for contig_idx, key in enumerate(sorted_keys):
-        ts = assemblage[key]
-        node_map = np.full(ts.num_nodes, _NULL, dtype=np.int64)
+        ts = ta[key]
+        node_map = np.full(ts.num_nodes, tskit.NULL, dtype=np.int64)
 
         # Add nodes from this contig, inserting shared nodes at correct positions
         for old_node_id in range(ts.num_nodes):
@@ -169,7 +178,7 @@ def to_ts(assemblage, record_provenance=True):
                     shared_node_counter
                 ]
                 # Append node from the first non-vacant contig
-                src_ts = assemblage[first_key]
+                src_ts = ta[first_key]
                 src_row = src_ts.tables.nodes[shared_nid]
 
                 # Optionally store vacant_bitflags in metadata
@@ -248,8 +257,8 @@ def to_ts(assemblage, record_provenance=True):
         mut_id_offset_before = len(new_tc.mutations)
         if len(mutations) > 0:
             new_parents = np.where(
-                mutations.parent == _NULL,
-                _NULL,
+                mutations.parent == tskit.NULL,
+                tskit.NULL,
                 mutations.parent + mut_id_offset_before,
             ).astype(np.int32)
             new_tc.mutations.append_columns(
@@ -276,9 +285,9 @@ def to_ts(assemblage, record_provenance=True):
                 stacklevel=2,
             )
             new_tc.nodes.append(
-                tskit.NodeTableRow(flags=0, time=0.0, population=_NULL, individual=_NULL)
+                tskit.NodeTableRow(flags=0, time=0.0, population=tskit.NULL, individual=tskit.NULL)
             )
-        src_ts = assemblage[first_key]
+        src_ts = ta[first_key]
         src_row = src_ts.tables.nodes[shared_nid]
         node_meta = _try_add_vacant_flags(
             src_row.metadata,
@@ -300,7 +309,7 @@ def to_ts(assemblage, record_provenance=True):
     return new_tc.tree_sequence()
 
 
-def from_ts(ts):
+def from_ts(ts, record_provenance=True):
     """
     Convert a single merged :class:`tskit.TreeSequence` back into a
     :class:`TreesAssemblage`.
@@ -312,6 +321,8 @@ def from_ts(ts):
     Parameters
     ----------
     ts : tskit.TreeSequence
+    record_provenance : bool
+        Whether to record provenance while splitting the merged tree sequence.
 
     Returns
     -------
@@ -328,7 +339,6 @@ def from_ts(ts):
 
     # Validate cumulative lengths
     sequence_lengths = [c["sequence_length"] for c in contigs_meta]
-    num_nodes_list = [c["num_nodes"] for c in contigs_meta]
     cumsum = [0.0] + list(np.cumsum(sequence_lengths))
 
     if abs(cumsum[-1] - ts.sequence_length) > 1e-10:
@@ -345,8 +355,7 @@ def from_ts(ts):
         )
 
     # Build a boolean array of nodes used so far
-    total_nodes = ts.num_nodes
-    node_used = np.zeros(total_nodes, dtype=bool)
+    node_used = np.zeros(ts.num_nodes, dtype=bool)
 
     # Determine which nodes have IS_SHARED set
     is_shared_global = (ts.tables.nodes.flags & NODE_IS_SHARED).astype(bool)
@@ -372,7 +381,7 @@ def from_ts(ts):
         candidate_ids = np.where(candidate)[0]
         if len(candidate_ids) < n_nodes:
             # Need more nodes — take next available
-            all_ids = np.arange(total_nodes)
+            all_ids = np.arange(ts.num_nodes)
             not_used = ~candidate
             extra = all_ids[not_used][: n_nodes - len(candidate_ids)]
             candidate_ids = np.sort(np.concatenate([candidate_ids, extra]))
@@ -383,19 +392,40 @@ def from_ts(ts):
 
         # Extract contig tree sequence using keep_intervals then shift
         contig_ts = (
-            ts.keep_intervals([[left, right]], simplify=False)
-            .shift(-left, sequence_length=seq_len, record_provenance=False)
+            ts.keep_intervals(
+                [[left, right]],
+                simplify=False,
+                record_provenance=False,
+            )
+            .shift(
+                -left,
+                sequence_length=seq_len,
+                record_provenance=False,
+            )
         )
 
         # Subset to the correct nodes
         # We need to keep candidate_ids in the new (shifted) tree sequence
         contig_tc = contig_ts.dump_tables()
-        contig_tc.subset(candidate_ids)
+        contig_tc.subset(candidate_ids, record_provenance=False)
 
         # Set per-contig metadata schema and metadata
-        contig_schema = make_permissive_contig_schema()
-        contig_tc.metadata_schema = contig_schema
+        contig_tc.metadata_schema = tskit.MetadataSchema.permissive_json()
         contig_tc.metadata = {CONTIG_METADATA_KEY: contig_meta_dict}
+
+        if record_provenance:
+            provenance_record = {
+                "software": {
+                    "name": "tskit_multichrom",
+                    "version": tskit_multichrom_version,
+                },
+                "parameters": {
+                    "command": "from_ts",
+                    "contig_index": int(contig_meta_dict.get("index", i)),
+                    "contig_symbol": str(contig_meta_dict.get("symbol", "")),
+                },
+            }
+            contig_tc.provenances.add_row(record=json.dumps(provenance_record))
 
         result[key] = contig_tc.tree_sequence()
 
@@ -463,7 +493,7 @@ def from_slim(tree_sequences, *, slim_metadata_key="SLiM"):
         # Ensure the top-level metadata schema is permissive JSON
         existing_schema = ts.metadata_schema.schema
         if not existing_schema or existing_schema.get("codec") != "json":
-            tables.metadata_schema = make_permissive_contig_schema()
+            tables.metadata_schema = tskit.MetadataSchema.permissive_json()
         else:
             # Try to add contig key to existing schema (permissive)
             import copy
