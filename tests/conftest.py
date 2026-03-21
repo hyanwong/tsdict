@@ -2,6 +2,7 @@
 Test fixtures and helpers for tskit_multichrom tests.
 """
 
+import numpy as np
 import tskit
 import tskit_multichrom as tmc
 
@@ -122,3 +123,63 @@ def make_two_contig_archive(mark_shared=True, num_samples=4):
             tmc.ContigKey(1, 1, "chr2", "A"): ts2,
         }
     )
+
+
+def make_autosomes_plus_x_archive(num_samples=4):
+    """
+    Return an A/A/X TreesAssemblage where chrX has fewer sample nodes.
+
+    chr1/chr2 have shared sample nodes 0..num_samples-1.
+    chrX keeps only the first half as samples/shared; the rest are nonsample,
+    nonshared. This gives different ``.samples()`` across chromosome types and
+    exercises vacancy handling on roundtrip conversion.
+    """
+    ts1 = make_ts(
+        seq_len=1000,
+        num_samples=num_samples,
+        contig_meta={"index": 0, "id": 0, "symbol": "chr1", "type": "A"},
+        mark_shared=False,
+    )
+    ts2 = make_ts(
+        seq_len=1200,
+        num_samples=num_samples,
+        contig_meta={"index": 1, "id": 1, "symbol": "chr2", "type": "A"},
+        mark_shared=False,
+    )
+    tsx = make_ts(
+        seq_len=800,
+        num_samples=num_samples,
+        contig_meta={"index": 2, "id": 2, "symbol": "chrX", "type": "X"},
+        mark_shared=False,
+    )
+
+    result = {}
+    for key, ts, mark_samples_shared in [
+        (tmc.ContigKey(0, 0, "chr1", "A"), ts1, True),
+        (tmc.ContigKey(1, 1, "chr2", "A"), ts2, True),
+        (tmc.ContigKey(2, 2, "chrX", "X"), tsx, False),
+    ]:
+        tables = ts.dump_tables()
+        if mark_samples_shared:
+            flags = tables.nodes.flags.copy()
+            sample_ids = ts.samples()
+            flags[sample_ids] = flags[sample_ids] | tmc.NODE_IS_SHARED
+            tables.nodes.flags = flags
+        else:
+            # chrX: keep only first half of samples as sample/shared
+            flags = tables.nodes.flags.copy()
+            sample_ids = ts.samples()
+            keep_n = len(sample_ids) // 2
+            keep_sample_ids = sample_ids[:keep_n]
+            drop_sample_ids = sample_ids[keep_n:]
+
+            # Keep sample status on first half and mark them shared.
+            flags[keep_sample_ids] = flags[keep_sample_ids] | tmc.NODE_IS_SHARED
+
+            # Remove sample + shared flags from second half.
+            clear_bits = np.uint32(tskit.NODE_IS_SAMPLE | tmc.NODE_IS_SHARED)
+            flags[drop_sample_ids] = flags[drop_sample_ids] & (~clear_bits)
+            tables.nodes.flags = flags
+        result[key] = tables.tree_sequence()
+
+    return tmc.TreesAssemblage(result)

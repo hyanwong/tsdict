@@ -8,6 +8,7 @@ import numpy as np
 import tskit
 
 from .flags import CONTIG_METADATA_KEY, NODE_IS_SHARED
+from .stats import TreesAssemblageStats
 
 # Named tuple representing a contig's key in the assemblage dictionary.
 # - index: ordering integer (not required to be consecutive)
@@ -47,6 +48,7 @@ class TreesAssemblage:
             sorted(tree_sequences.items(), key=lambda item: item[0].index)
         )
         self._build_cache()
+        self._stats = TreesAssemblageStats(self)
 
     # ------------------------------------------------------------------
     # Validation
@@ -333,6 +335,11 @@ class TreesAssemblage:
     def num_contigs(self):
         """int: Number of contigs in the assemblage."""
         return len(self._tree_sequences)
+
+    @property
+    def stats(self):
+        """Statistics namespace, mirroring selected tskit statistics APIs."""
+        return self._stats
 
     # ------------------------------------------------------------------
     # Dictionary-like interface
