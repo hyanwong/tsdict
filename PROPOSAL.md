@@ -10,7 +10,7 @@ We refer to a folder of associated tree sequences as a "trees archive" (already 
 
 Key points:
 
-* The library is a thin Python wrapper around a dictionary of tree sequences, with the component tree sequences encoding some shared data (e.g. identical individuals tables)
+* The library is a thin Python wrapper around a dictionary of tree sequences, with the component tree sequences containing some shared data (e.g. identical individuals tables)
 * The dictionary values are tree sequences, with keys being namedtuples of (index, id, symbol, type) - the first 3 must be unique: index and id are integers, symbol and type are strings. However, component tree sequences can more easily be accessed via "id" or "symbol" using e.g. `ta.contig("X")`
 * We aim to maintain SLiM compatibility as far as possible
 * We want to support a mix of presence and absence of cross chromosomal phasing (e.g. if there are parent/child trios in a dataset, the children can be phased across chromosomes, but that may not be possible for the parents)
