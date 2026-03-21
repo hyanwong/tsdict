@@ -647,13 +647,9 @@ def from_tree_sequences(
         # Update the tables with the complete modified flags array
         tables.nodes.flags = flags
 
-        # Add 'contig' key to top-level metadata
-        contig_dict = {
-            "index": int(idx),
-            "id": int(contig_id),
-            "symbol": str(symbol),
-            "type": str(typ),
-        }
+        # Create ContigKey and extract contig metadata dict
+        key = ContigKey(index=idx, id=contig_id, symbol=symbol, type=typ)
+        contig_dict = key._asdict()
         
         # Get current metadata
         meta = ts.metadata
@@ -683,7 +679,6 @@ def from_tree_sequences(
         tables.metadata = meta
         
         ts_final = tables.tree_sequence()
-        key = ContigKey(index=idx, id=contig_id, symbol=symbol, type=typ)
         ta_dict[key] = ts_final
 
     return TreesAssemblage(ta_dict)
