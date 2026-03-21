@@ -4,7 +4,7 @@ A Python library for efficiently storing and analyzing multiple chromosomes (con
 
 ## Why tskit_multichrom?
 
-Population genetics simulators like **msprime** and **SLiM** typically produce separate tree sequences for each chromosome. `tskit_multichrom` provides:
+Population genetics simulators like **msprime** and **SLiM** (prior to v5) typically produce separate tree sequences for each chromosome. `tskit_multichrom` provides:
 
 - **Unified storage**: Manage multiple per-chromosome tree sequences as a single `TreesAssemblage` object
 - **Cross-chromosome analysis**: Compute statistics across all chromosomes when samples are shared (e.g., diversity)
