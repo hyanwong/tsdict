@@ -27,3 +27,7 @@ htmlcov/
 # Distribution / packaging
 *.whl
 *.tar.gz
+
+# Large test output files
+*.trees.zip
+*.zip
