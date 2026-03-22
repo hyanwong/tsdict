@@ -1,4 +1,4 @@
-# Proposal for a tskit_multichrom library providing multiple-chromosome (contig) support for tskit
+# Proposal for a tsdict library providing multiple-chromosome (contig) support for tskit
 
 **NOTE (March 2026):** This proposal has been substantially implemented. See the "IMPLEMENTATION STATUS SUMMARY" section at the end for a detailed breakdown of what is complete and what remains to be done.
 
@@ -6,7 +6,7 @@
 
 See https://docs.google.com/document/d/1mjZEuxetIfja8WD4DIt5NQXxKNe2u-kw64vjPjiwLPw
 
-We refer to a folder of associated tree sequences as a "trees archive" (already used by SLiM), and use the generic variable name `ta`. The object loaded from a trees archive is called a `TreesAssemblage` (somewhat clunky: the name can be changed if need be). Officially each tree sequence in the archive is a "contig", but in practice, these are usually chromosomes.
+We refer to a folder of associated tree sequences as a "trees archive" (already used by SLiM), and use the generic variable name `tsd`. The object loaded from a trees archive is called a `TreeSequenceDictionary` (somewhat clunky: the name can be changed if need be). Officially each tree sequence in the archive is a "contig", but in practice, these are usually chromosomes.
 
 Key points:
 
@@ -49,7 +49,7 @@ The tskit node ID is used to link all nodes that are shared. This has the major 
 
 ✅ **IMPLEMENTED**
 
-Loading: `tskit_multichrom.load(filename)`
+Loading: `tsdict.load(filename)`
 
 1. ✅ We check that the tree sequences in the archive conform to the requirements above, in particular checking for node identity requirements (point 7 above)
 2. ✅ We perform caching (see below)
@@ -129,7 +129,7 @@ We enumerate through the top-level array getting `i` and the `num_nodes` for eac
 
 ✅ **PARTIALLY IMPLEMENTED**
 
-`TreesAssemblage.simplify(samples=None, *, individuals=None)` simplifies all contigs in a coordinated way.
+`TreeSequenceDictionary.simplify(samples=None, *, individuals=None)` simplifies all contigs in a coordinated way.
 
 * `samples=[...]`: provided node IDs must be globally phased.
 * `individuals=[...]`: simplifies each contig using sample nodes for those individuals; this works on nonglobal-sample ARGs where nonglobal sample nodes are present.
@@ -158,7 +158,7 @@ arguments may not be appropriate)
 ## IMPLEMENTATION STATUS SUMMARY
 
 ### Core Functionality (✅ Complete)
-- ✅ TreesAssemblage class with validation
+- ✅ TreeSequenceDictionary class with validation
 - ✅ ContigKey namedtuple for organizing contigs
 - ✅ Loading and saving archives (load/dump)
 - ✅ Caching system (total_sequence_length, global_phased_node_ids, nonglobal_sample_node_count, contig metadata)
@@ -174,9 +174,9 @@ arguments may not be appropriate)
 - ✅ Reorder contigs by specifying desired order
 
 ### Conversion Functions (✅ Complete)
-- ✅ ta.to_ts() — merge TreesAssemblage into single TreeSequence
-- ✅ from_ts() — split single TreeSequence into TreesAssemblage
-- ✅ from_slim() — convert SLiM-style tree sequences to TreesAssemblage
+- ✅ ta.to_ts() — merge TreeSequenceDictionary into single TreeSequence
+- ✅ from_ts() — split single TreeSequence into TreeSequenceDictionary
+- ✅ from_slim() — convert SLiM-style tree sequences to TreeSequenceDictionary
 - ✅ from_tree_sequences() — create assemblage from list of tree sequences
 
 ### Statistics (⚠️ Partial)

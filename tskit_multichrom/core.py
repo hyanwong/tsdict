@@ -1,5 +1,5 @@
 """
-Core TreesAssemblage class for tskit_multichrom.
+Core TreeSequenceDictionary class for tskit_multichrom.
 """
 
 import collections
@@ -8,7 +8,7 @@ import numpy as np
 import tskit
 
 from .flags import CONTIG_METADATA_KEY, NODE_IS_SHARED
-from .stats import TreesAssemblageStats
+from .stats import TreeSequenceDictionaryStats
 
 # Named tuple representing a contig's key in the assemblage dictionary.
 # - index: ordering integer (not required to be consecutive)
@@ -18,7 +18,7 @@ from .stats import TreesAssemblageStats
 ContigKey = collections.namedtuple("ContigKey", ["index", "id", "symbol", "type"])
 
 
-class TreesAssemblage:
+class TreeSequenceDictionary:
     """
     A dictionary-like collection of tree sequences representing multiple contigs
     (chromosomes), with additional methods that allow manipulation or analysis of
@@ -48,7 +48,7 @@ class TreesAssemblage:
             sorted(tree_sequences.items(), key=lambda item: item[0].index)
         )
         self._build_cache()
-        self._stats = TreesAssemblageStats(self)
+        self._stats = TreeSequenceDictionaryStats(self)
 
     # ------------------------------------------------------------------
     # Validation
@@ -75,7 +75,7 @@ class TreesAssemblage:
         but the keys must be ContigKey instances and
         the values must be tskit.TreeSequence instances.
         """
-        TreesAssemblage._check_tree_sequence_mapping(tree_sequences)
+        TreeSequenceDictionary._check_tree_sequence_mapping(tree_sequences)
         if len(tree_sequences) == 0:
             return
 
@@ -107,7 +107,7 @@ class TreesAssemblage:
 
         # Check ContigKey matches top-level metadata of each tree sequence
         for key, ts in tree_sequences.items():
-            TreesAssemblage._check_contig_metadata(key, ts)
+            TreeSequenceDictionary._check_contig_metadata(key, ts)
 
         # Reference tree sequence (first in index order)
         ref_ts = tss[0]
@@ -156,7 +156,7 @@ class TreesAssemblage:
         # Check IS_SHARED node identity: any node with IS_SHARED set must be
         # identical (flags, time, individual, population, metadata) across all
         # tree sequences that contain that node ID.
-        TreesAssemblage._validate_shared_nodes(tree_sequences)
+        TreeSequenceDictionary._validate_shared_nodes(tree_sequences)
 
     @staticmethod
     def _check_contig_metadata(key, ts):
@@ -298,7 +298,7 @@ class TreesAssemblage:
 
     @property
     def contigs(self):
-        """list[ContigKey]: Contig keys sorted by index. Equivalent to list(ta.keys())."""
+        """list[ContigKey]: Contig keys sorted by index. Equivalent to list(tsd.keys())."""
         return list(self.keys())
 
     @property
@@ -408,7 +408,7 @@ class TreesAssemblage:
     def __repr__(self):
         symbols = [k.symbol for k in self._tree_sequences.keys()]
         return (
-            f"TreesAssemblage(contigs={symbols!r}, "
+            f"TreeSequenceDictionary(contigs={symbols!r}, "
             f"total_length={self.total_sequence_length})"
         )
 
@@ -418,7 +418,7 @@ class TreesAssemblage:
 
     def subset(self, *, symbols=None, type=None, types=None, ids=None, indexes=None):
         """
-        Create a new :class:`TreesAssemblage` from a subset of contigs.
+        Create a new :class:`TreeSequenceDictionary` from a subset of contigs.
 
         Subsetting is cheap: it does not copy the underlying tree sequences.
         Only the cache is recomputed.
@@ -439,7 +439,7 @@ class TreesAssemblage:
 
         Returns
         -------
-        TreesAssemblage
+        TreeSequenceDictionary
         """
         keep = set(self._tree_sequences.keys())
 
@@ -464,7 +464,7 @@ class TreesAssemblage:
             keep &= {k for k in keep if k.index in indexes_set}
 
         new_ts = {k: self._tree_sequences[k] for k in keep}
-        return TreesAssemblage(new_ts, skip_validation=True)
+        return TreeSequenceDictionary(new_ts, skip_validation=True)
 
     # ------------------------------------------------------------------
     # Reindexing
@@ -472,7 +472,7 @@ class TreesAssemblage:
 
     def reindex(self, order=None):
         """
-        Return a new :class:`TreesAssemblage` with contigs reindexed from 0..N-1.
+        Return a new :class:`TreeSequenceDictionary` with contigs reindexed from 0..N-1.
 
         This makes copies of the underlying tree sequences with updated metadata.
 
@@ -484,7 +484,7 @@ class TreesAssemblage:
 
         Returns
         -------
-        TreesAssemblage
+        TreeSequenceDictionary
         """
         if order is None:
             ordered_keys = list(self._tree_sequences.keys())
@@ -525,7 +525,7 @@ class TreesAssemblage:
             )
             new_ts[new_key] = tables.tree_sequence()
 
-        return TreesAssemblage(new_ts)
+        return TreeSequenceDictionary(new_ts)
 
     # ------------------------------------------------------------------
     # I/O
@@ -571,7 +571,7 @@ class TreesAssemblage:
 
     def simplify(self, samples=None, *, individuals=None, record_provenance=True):
         """
-        Return a new simplified :class:`TreesAssemblage`.
+        Return a new simplified :class:`TreeSequenceDictionary`.
 
         All tree sequences in the assemblage are simplified simultaneously,
         maintaining consistent node IDs for shared nodes across contigs.
@@ -594,7 +594,7 @@ class TreesAssemblage:
 
         Returns
         -------
-        TreesAssemblage
+        TreeSequenceDictionary
 
         Raises
         ------
@@ -607,7 +607,7 @@ class TreesAssemblage:
             raise ValueError("Cannot specify both 'samples' and 'individuals'")
 
         if self.num_contigs == 0:
-            return TreesAssemblage({})
+            return TreeSequenceDictionary({})
 
         sorted_keys = self.contigs
 
@@ -617,7 +617,7 @@ class TreesAssemblage:
                     "Cannot simplify an assemblage with nonglobal sample nodes "
                     "without specifying 'samples' or 'individuals'. Provide "
                     "individuals=[...] to select which individuals to retain, or "
-                    "call ta.subset() first to restrict to fully cross-phased contigs."
+                    "call tsd.subset() first to restrict to fully cross-phased contigs."
                 )
             # Consistent ordering across all contigs: sort globally phased node IDs.
             # Since there are no nonglobal sample nodes, every sample in every
@@ -663,7 +663,7 @@ class TreesAssemblage:
                 record_provenance=record_provenance,
             )
 
-        return TreesAssemblage(new_ts_dict)
+        return TreeSequenceDictionary(new_ts_dict)
 
 
 # ------------------------------------------------------------------

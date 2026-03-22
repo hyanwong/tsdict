@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "tskit_multichrom"
+name = "tsdict"
 dynamic = ["version"]
-description = "A wrapper on top of tskit for storing and analysing multiple chromosomes"
+description = "TreeSequenceDictionary utilities for linked collections of tree sequences"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.9"
@@ -24,10 +24,10 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["tskit_multichrom*"]
+include = ["tsdict*"]
 
 [tool.setuptools.dynamic]
-version = {attr = "tskit_multichrom._version.tskit_multichrom_version"}
+version = {attr = "tsdict._version.tsdict_version"}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
