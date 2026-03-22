@@ -2,7 +2,7 @@
 tskit_multichrom: A wrapper on top of tskit for storing and analysing
 multiple chromosomes (contigs).
 
-The central object is :class:`TreesAssemblage` (abbreviated ``ta``), which holds
+The central object is :class:`TreeSequenceDictionary` (abbreviated ``tsd``), which holds
 a collection of :class:`tskit.TreeSequence` objects — one per contig — stored
 in a dictionary keyed by :class:`ContigKey` namedtuples.
 
@@ -11,10 +11,10 @@ Quick start::
     import tskit_multichrom as tmc
 
     # Load from a directory or zip archive
-    ta = tmc.load("genome_trees")
+    tsd = tmc.load("genome_trees")
 
     # Create from a list of tree sequences
-    ta = tmc.from_tree_sequences(
+    tsd = tmc.from_tree_sequences(
         [ts1, ts2],
         ids=[1, 2],
         symbols=["chr1", "chr2"],
@@ -22,21 +22,21 @@ Quick start::
     )
 
     # Access a contig by symbol
-    chr1_ts = ta.contig("chr1")
+    chr1_ts = tsd.contig("chr1")
 
     # Save back to a directory
-    ta.dump("genome_trees")
+    tsd.dump("genome_trees")
 
     # Convert to a single tree sequence
-    ts = ta.to_ts()
+    ts = tsd.to_ts()
 
     # Convert back
-    ta2 = tmc.from_ts(ts)
+    tsd2 = tmc.from_ts(ts)
 """
 
 from .core import (
     ContigKey,
-    TreesAssemblage,
+    TreeSequenceDictionary,
     make_contig_key,
 )
 from .convert import from_slim, from_tree_sequences, from_ts
@@ -46,7 +46,7 @@ from ._version import tskit_multichrom_version as __version__
 
 __all__ = [
     # Core
-    "TreesAssemblage",
+    "TreeSequenceDictionary",
     "ContigKey",
     "make_contig_key",
     # I/O

@@ -1,5 +1,5 @@
 """
-Conversion functions between a :class:`TreesAssemblage` and a single
+Conversion functions between a :class:`TreeSequenceDictionary` and a single
 :class:`tskit.TreeSequence`.
 
 Overview
@@ -9,11 +9,11 @@ concatenating their genomic coordinate systems, placing contigs end-to-end.
 Shared nodes (IS_SHARED flag) retain their IDs; non-shared nodes get new IDs.
 
 **from_ts** reverses this process, splitting the single tree
-sequence back into a TreesAssemblage using the top-level metadata array that
+sequence back into a TreeSequenceDictionary using the top-level metadata array that
 records per-contig ``sequence_length``, ``num_nodes``, and ``contig``.
 
 **from_slim** converts a set of SLiM-style tree sequences (where all nodes
-are implicitly shared) into a :class:`TreesAssemblage`.
+are implicitly shared) into a :class:`TreeSequenceDictionary`.
 """
 
 import copy
@@ -24,16 +24,16 @@ import numpy as np
 import tskit
 
 from ._version import tskit_multichrom_version
-from .core import ContigKey, TreesAssemblage, make_contig_key
+from .core import ContigKey, TreeSequenceDictionary, make_contig_key
 from .flags import CONTIG_METADATA_KEY, NODE_IS_SHARED
 
 # Top-level metadata key used in the single-TS representation
 _ARCHIVE_META_KEY = "contigs"
 
 
-def to_ts(ta, record_provenance=True):
+def to_ts(tsd, record_provenance=True):
     """
-    Merge a :class:`TreesAssemblage` into a single :class:`tskit.TreeSequence`.
+    Merge a :class:`TreeSequenceDictionary` into a single :class:`tskit.TreeSequence`.
 
     Contigs are placed end-to-end in order of their ``index`` values.
     Shared nodes (those with :data:`~tskit_multichrom.flags.NODE_IS_SHARED` set)
@@ -45,7 +45,7 @@ def to_ts(ta, record_provenance=True):
 
     Parameters
     ----------
-    ta : TreesAssemblage
+    tsd : TreeSequenceDictionary
     record_provenance : bool
         Whether to append a provenance record for this ``to_ts`` call.
 
@@ -53,18 +53,18 @@ def to_ts(ta, record_provenance=True):
     -------
     tskit.TreeSequence
     """
-    if ta.num_contigs == 0:
+    if tsd.num_contigs == 0:
         raise ValueError("Cannot convert an empty archive to a tree sequence")
 
-    sorted_keys = ta.contigs  # sorted by index
+    sorted_keys = tsd.contigs  # sorted by index
 
     # ------------------------------------------------------------------
     # 1. Validate that site and mutation schemas are identical
     # ------------------------------------------------------------------
-    ref_site_schema = ta[sorted_keys[0]].tables.sites.metadata_schema
-    ref_mut_schema = ta[sorted_keys[0]].tables.mutations.metadata_schema
+    ref_site_schema = tsd[sorted_keys[0]].tables.sites.metadata_schema
+    ref_mut_schema = tsd[sorted_keys[0]].tables.mutations.metadata_schema
     for key in sorted_keys[1:]:
-        ts = ta[key]
+        ts = tsd[key]
         if ts.tables.sites.metadata_schema != ref_site_schema:
             raise ValueError(
                 f"Site metadata schemas differ between contigs: cannot merge. "
@@ -82,7 +82,7 @@ def to_ts(ta, record_provenance=True):
     #    vacant_bitflags: bit i set if the contig with metadata 'index' i is absent
     # ------------------------------------------------------------------
     # Node IDs with IS_SHARED set in at least one contig.
-    shared_node_ids = ta.shared_node_ids
+    shared_node_ids = tsd.shared_node_ids
 
     # For each shared node ID, build vacant_bitflags and find first non-vacant contig
     shared_node_array = []  # list of (node_id, first_contig_key, vacant_bitflags)
@@ -91,7 +91,7 @@ def to_ts(ta, record_provenance=True):
         vacant_bitflags = 0
         first_key = None
         for key in sorted_keys:
-            ts = ta[key]
+            ts = tsd[key]
             if nid < ts.num_nodes and (ts.tables.nodes[nid].flags & NODE_IS_SHARED):
                 if first_key is None:
                     first_key = key
@@ -105,8 +105,8 @@ def to_ts(ta, record_provenance=True):
     # ------------------------------------------------------------------
     # 3. Build new TableCollection
     # ------------------------------------------------------------------
-    ref_ts = ta[sorted_keys[0]]
-    new_tc = tskit.TableCollection(sequence_length=ta.total_sequence_length)
+    ref_ts = tsd[sorted_keys[0]]
+    new_tc = tskit.TableCollection(sequence_length=tsd.total_sequence_length)
 
     # Copy individual, population tables from reference
     new_tc.individuals.replace_with(ref_ts.tables.individuals)
@@ -125,7 +125,7 @@ def to_ts(ta, record_provenance=True):
     # ------------------------------------------------------------------
     contigs_meta = []
     for key in sorted_keys:
-        ts = ta[key]
+        ts = tsd[key]
         entry = {
             "sequence_length": ts.sequence_length,
             "num_nodes": ts.num_nodes,
@@ -164,7 +164,7 @@ def to_ts(ta, record_provenance=True):
     all_node_maps = []
 
     for contig_idx, key in enumerate(sorted_keys):
-        ts = ta[key]
+        ts = tsd[key]
         node_map = np.full(ts.num_nodes, tskit.NULL, dtype=np.int64)
 
         # Add nodes from this contig, inserting shared nodes at correct positions
@@ -179,7 +179,7 @@ def to_ts(ta, record_provenance=True):
                     shared_node_counter
                 ]
                 # Append node from the first non-vacant contig
-                src_ts = ta[first_key]
+                src_ts = tsd[first_key]
                 src_row = src_ts.tables.nodes[shared_nid]
 
                 # Optionally store vacant_bitflags in metadata
@@ -288,7 +288,7 @@ def to_ts(ta, record_provenance=True):
             new_tc.nodes.append(
                 tskit.NodeTableRow(flags=0, time=0.0, population=tskit.NULL, individual=tskit.NULL)
             )
-        src_ts = ta[first_key]
+        src_ts = tsd[first_key]
         src_row = src_ts.tables.nodes[shared_nid]
         node_meta = _try_add_vacant_flags(
             src_row.metadata,
@@ -313,7 +313,7 @@ def to_ts(ta, record_provenance=True):
 def from_ts(ts, record_provenance=True):
     """
     Convert a single merged :class:`tskit.TreeSequence` back into a
-    :class:`TreesAssemblage`.
+    :class:`TreeSequenceDictionary`.
 
     The input tree sequence must have been created by :func:`to_ts`
     (or equivalent), with top-level metadata containing a
@@ -327,7 +327,7 @@ def from_ts(ts, record_provenance=True):
 
     Returns
     -------
-    TreesAssemblage
+    TreeSequenceDictionary
     """
     meta = ts.metadata
     if not isinstance(meta, dict) or _ARCHIVE_META_KEY not in meta:
@@ -432,12 +432,12 @@ def from_ts(ts, record_provenance=True):
 
         result[key] = contig_tc.tree_sequence()
 
-    return TreesAssemblage(result)
+    return TreeSequenceDictionary(result)
 
 
 def from_slim(tree_sequences, *, slim_metadata_key="SLiM"):
     """
-    Convert SLiM-style tree sequences into a :class:`TreesAssemblage`.
+    Convert SLiM-style tree sequences into a :class:`TreeSequenceDictionary`.
 
     In SLiM tree sequences all nodes are shared across chromosomes, so
     :data:`~tskit_multichrom.flags.NODE_IS_SHARED` is set on every node.
@@ -453,7 +453,7 @@ def from_slim(tree_sequences, *, slim_metadata_key="SLiM"):
 
     Returns
     -------
-    TreesAssemblage
+    TreeSequenceDictionary
     """
     result = {}
     for ts in tree_sequences:
@@ -513,7 +513,7 @@ def from_slim(tree_sequences, *, slim_metadata_key="SLiM"):
         tables.metadata = new_meta
         result[key] = tables.tree_sequence()
 
-    return TreesAssemblage(result)
+    return TreeSequenceDictionary(result)
 
 
 def from_tree_sequences(
@@ -525,9 +525,9 @@ def from_tree_sequences(
     shared_nodes=None,
 ):
     """
-    Create a :class:`TreesAssemblage` from a list of tree sequences without contig metadata.
+    Create a :class:`TreeSequenceDictionary` from a list of tree sequences without contig metadata.
 
-    This function combines multiple independent tree sequences into a TreesAssemblage,
+    This function combines multiple independent tree sequences into a TreeSequenceDictionary,
     automatically annotating them with contig metadata and optionally marking shared nodes.
 
     Parameters
@@ -554,8 +554,8 @@ def from_tree_sequences(
 
     Returns
     -------
-    TreesAssemblage
-        A new TreesAssemblage with contigs in index order.
+    TreeSequenceDictionary
+        A new TreeSequenceDictionary with contigs in index order.
 
     Raises
     ------
@@ -566,7 +566,7 @@ def from_tree_sequences(
 
     Examples
     --------
-    >>> ta = from_tree_sequences(
+    >>> tsd = from_tree_sequences(
     ...     [ts20, ts21],
     ...     ids=[20, 21],
     ...     symbols=["20", "21"],
@@ -575,7 +575,7 @@ def from_tree_sequences(
 
     Mark all sample nodes as shared:
 
-    >>> ta = from_tree_sequences(
+    >>> tsd = from_tree_sequences(
     ...     [ts20, ts21],
     ...     ids=[20, 21],
     ...     symbols=["20", "21"],
@@ -621,8 +621,8 @@ def from_tree_sequences(
                 "shared_nodes must be None, 'samples', or a list of node IDs"
             ) from e
 
-    # Build TreesAssemblage dict
-    ta_dict = {}
+    # Build TreeSequenceDictionary dict
+    result = {}
     for i, (ts, idx, contig_id, symbol, typ) in enumerate(
         zip(tree_sequences, indexes, ids, symbols, types)
     ):
@@ -681,9 +681,9 @@ def from_tree_sequences(
         tables.metadata = meta
         
         ts_final = tables.tree_sequence()
-        ta_dict[key] = ts_final
+        result[key] = ts_final
 
-    return TreesAssemblage(ta_dict)
+    return TreeSequenceDictionary(result)
 
 
 def _get_shared_for_contig(ts, is_shared_global, contig_index):

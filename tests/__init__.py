@@ -1,1 +1,1 @@
-# tskit_multichrom tests package
+# tsdict tests package

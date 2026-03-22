@@ -1,13 +1,13 @@
-"""Statistics helpers for TreesAssemblage."""
+"""Statistics helpers for TreeSequenceDictionary."""
 
 import numpy as np
 
 
-class TreesAssemblageStats:
-    """Statistics namespace for :class:`tskit_multichrom.core.TreesAssemblage`."""
+class TreeSequenceDictionaryStats:
+    """Statistics namespace for :class:`tskit_multichrom.core.TreeSequenceDictionary`."""
 
-    def __init__(self, ta):
-        self._ta = ta
+    def __init__(self, tsd):
+        self._tsd = tsd
 
     def _resolve_sample_sets(self, sample_sets):
         """
@@ -19,10 +19,10 @@ class TreesAssemblageStats:
         - If ``sample_sets is None`` and nonglobal samples exist, raise.
         - If ``sample_sets`` is provided, every sample ID must be globally phased.
         """
-        global_phased = set(self._ta.global_phased_node_ids)
+        global_phased = set(self._tsd.global_phased_node_ids)
 
         if sample_sets is None:
-            if self._ta.nonglobal_sample_node_count != 0:
+            if self._tsd.nonglobal_sample_node_count != 0:
                 raise ValueError(
                     "sample_sets must be provided when nonglobal sample nodes are present"
                 )
@@ -48,7 +48,7 @@ class TreesAssemblageStats:
 
         For ``windows=None``, this computes per-contig diversity and combines
         values by contig span so that results match running ``diversity`` on
-        ``to_ts(ta)`` for the same arguments.
+        ``to_ts(tsd)`` for the same arguments.
 
         Notes
         -----
@@ -57,17 +57,17 @@ class TreesAssemblageStats:
         """
         if windows is not None:
             raise NotImplementedError(
-                "ta.stats.diversity does not yet support windows"
+                "tsd.stats.diversity does not yet support windows"
             )
 
-        if self._ta.num_contigs == 0:
-            raise ValueError("Cannot compute diversity on an empty TreesAssemblage")
+        if self._tsd.num_contigs == 0:
+            raise ValueError("Cannot compute diversity on an empty TreeSequenceDictionary")
 
         effective_sample_sets = self._resolve_sample_sets(sample_sets)
 
         values = []
         spans = []
-        for ts in self._ta.values():
+        for ts in self._tsd.values():
             values.append(
                 ts.diversity(
                     sample_sets=effective_sample_sets,
@@ -115,7 +115,7 @@ class TreesAssemblageStats:
         """
         Perform PCA across all contigs.
 
-        Internally calls ``ta.to_ts()`` to obtain a single combined tree
+        Internally calls ``tsd.to_ts()`` to obtain a single combined tree
         sequence and then delegates to :meth:`tskit.TreeSequence.pca`.
 
         When ``samples`` is provided (or defaulted) every sample node ID must
@@ -130,7 +130,7 @@ class TreesAssemblageStats:
             Number of principal components to return.
         windows : list, optional
             Genomic windows; coordinates refer to the combined tree sequence
-            returned by ``ta.to_ts()``.
+            returned by ``tsd.to_ts()``.
         samples : array_like, optional
             Sample node IDs. Must be globally phased. Mutually exclusive with
             ``individuals``.
@@ -154,10 +154,10 @@ class TreesAssemblageStats:
         if samples is not None and individuals is not None:
             raise ValueError("Cannot specify both samples and individuals")
 
-        ts = self._ta.to_ts()
+        ts = self._tsd.to_ts()
 
         if individuals is not None:
-            types = {key.type for key in self._ta.contigs}
+            types = {key.type for key in self._tsd.contigs}
             if len(types) > 1:
                 raise ValueError(
                     "pca with individuals requires all contigs to be the same"
@@ -181,16 +181,16 @@ class TreesAssemblageStats:
             )
 
         if samples is None:
-            if self._ta.is_nonglobal_sample_arg:
+            if self._tsd.is_nonglobal_sample_arg:
                 raise ValueError(
                     "individuals or samples must be provided when nonglobal"
                     " sample nodes are present"
                 )
             effective_samples = np.asarray(
-                sorted(self._ta.global_phased_node_ids), dtype=np.int32
+                sorted(self._tsd.global_phased_node_ids), dtype=np.int32
             )
         else:
-            global_phased = set(self._ta.global_phased_node_ids)
+            global_phased = set(self._tsd.global_phased_node_ids)
             for sid in samples:
                 if int(sid) not in global_phased:
                     raise ValueError(

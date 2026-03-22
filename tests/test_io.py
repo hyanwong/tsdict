@@ -1,5 +1,5 @@
 """
-Tests for TreesAssemblage I/O (load/dump).
+Tests for TreeSequenceDictionary I/O (load/dump).
 """
 
 import os
@@ -9,7 +9,7 @@ import zipfile
 import pytest
 import tskit
 
-import tskit_multichrom as tmc
+import tsdict as tmc
 from tests.conftest import make_two_contig_archive
 
 
@@ -17,36 +17,36 @@ class TestDumpLoadZip:
     """Tests for the _trees.zip format."""
 
     def test_roundtrip(self):
-        ta = make_two_contig_archive()
+        tsd = make_two_contig_archive()
         with tempfile.NamedTemporaryFile(suffix="_trees.zip", delete=False) as f:
             path = f.name
         try:
-            ta.dump(path)
-            ta2 = tmc.load(path)
-            assert ta2.num_contigs == 2
-            assert ta2.total_sequence_length == ta.total_sequence_length
+            tsd.dump(path)
+            tsd2 = tmc.load(path)
+            assert tsd2.num_contigs == 2
+            assert tsd2.total_sequence_length == tsd.total_sequence_length
         finally:
             os.unlink(path)
 
     def test_roundtrip_contigs(self):
-        ta = make_two_contig_archive()
+        tsd = make_two_contig_archive()
         with tempfile.NamedTemporaryFile(suffix="_trees.zip", delete=False) as f:
             path = f.name
         try:
-            ta.dump(path)
-            ta2 = tmc.load(path)
-            assert ta2.contig("chr1").sequence_length == 1000
-            assert ta2.contig("chr2").sequence_length == 2000
+            tsd.dump(path)
+            tsd2 = tmc.load(path)
+            assert tsd2.contig("chr1").sequence_length == 1000
+            assert tsd2.contig("chr2").sequence_length == 2000
         finally:
             os.unlink(path)
 
     def test_filenames_use_symbol(self):
         """Files inside the zip should use symbol, not index."""
-        ta = make_two_contig_archive()
+        tsd = make_two_contig_archive()
         with tempfile.NamedTemporaryFile(suffix="_trees.zip", delete=False) as f:
             path = f.name
         try:
-            ta.dump(path)
+            tsd.dump(path)
             with zipfile.ZipFile(path, "r") as zf:
                 names = zf.namelist()
             assert "chr1.trees" in names
@@ -56,11 +56,11 @@ class TestDumpLoadZip:
 
     def test_zip_is_stored_not_compressed(self):
         """The zip should use ZIP_STORED (no deflate)."""
-        ta = make_two_contig_archive()
+        tsd = make_two_contig_archive()
         with tempfile.NamedTemporaryFile(suffix="_trees.zip", delete=False) as f:
             path = f.name
         try:
-            ta.dump(path)
+            tsd.dump(path)
             with zipfile.ZipFile(path, "r") as zf:
                 for info in zf.infolist():
                     assert info.compress_type == zipfile.ZIP_STORED, (
@@ -91,13 +91,13 @@ class TestDumpLoadZip:
             os.unlink(path)
 
     def test_node_flags_preserved(self):
-        ta = make_two_contig_archive(mark_shared=True)
+        tsd = make_two_contig_archive(mark_shared=True)
         with tempfile.NamedTemporaryFile(suffix="_trees.zip", delete=False) as f:
             path = f.name
         try:
-            ta.dump(path)
-            ta2 = tmc.load(path)
-            ts = ta2.contig("chr1")
+            tsd.dump(path)
+            tsd2 = tmc.load(path)
+            ts = tsd2.contig("chr1")
             for node_id in range(ts.num_nodes):
                 flags = ts.tables.nodes[node_id].flags
                 assert flags & tmc.NODE_IS_SHARED, (
@@ -111,28 +111,28 @@ class TestDumpLoadDir:
     """Tests for the directory (_trees) format."""
 
     def test_roundtrip(self):
-        ta = make_two_contig_archive()
+        tsd = make_two_contig_archive()
         with tempfile.TemporaryDirectory() as tmpdir:
             path = os.path.join(tmpdir, "genome_trees")
-            ta.dump(path)
-            ta2 = tmc.load(path)
-            assert ta2.num_contigs == 2
-            assert ta2.total_sequence_length == ta.total_sequence_length
+            tsd.dump(path)
+            tsd2 = tmc.load(path)
+            assert tsd2.num_contigs == 2
+            assert tsd2.total_sequence_length == tsd.total_sequence_length
 
     def test_roundtrip_contigs(self):
-        ta = make_two_contig_archive()
+        tsd = make_two_contig_archive()
         with tempfile.TemporaryDirectory() as tmpdir:
             path = os.path.join(tmpdir, "genome_trees")
-            ta.dump(path)
-            ta2 = tmc.load(path)
-            assert ta2.contig("chr1").sequence_length == 1000
-            assert ta2.contig("chr2").sequence_length == 2000
+            tsd.dump(path)
+            tsd2 = tmc.load(path)
+            assert tsd2.contig("chr1").sequence_length == 1000
+            assert tsd2.contig("chr2").sequence_length == 2000
 
     def test_filenames_use_symbol(self):
-        ta = make_two_contig_archive()
+        tsd = make_two_contig_archive()
         with tempfile.TemporaryDirectory() as tmpdir:
             path = os.path.join(tmpdir, "genome_trees")
-            ta.dump(path)
+            tsd.dump(path)
             files = os.listdir(path)
         assert "chr1.trees" in files
         assert "chr2.trees" in files
@@ -144,24 +144,24 @@ class TestDumpLoadDir:
 
 
 class TestDumpMethod:
-    """Tests for TreesAssemblage.dump() instance method."""
+    """Tests for TreeSequenceDictionary.dump() instance method."""
 
     def test_dump_method_zip(self):
-        ta = make_two_contig_archive()
+        tsd = make_two_contig_archive()
         with tempfile.NamedTemporaryFile(suffix="_trees.zip", delete=False) as f:
             path = f.name
         try:
-            ta.dump(path)
-            ta2 = tmc.load(path)
-            assert ta2.num_contigs == 2
-            assert ta2.total_sequence_length == ta.total_sequence_length
+            tsd.dump(path)
+            tsd2 = tmc.load(path)
+            assert tsd2.num_contigs == 2
+            assert tsd2.total_sequence_length == tsd.total_sequence_length
         finally:
             os.unlink(path)
 
     def test_dump_method_dir(self):
-        ta = make_two_contig_archive()
+        tsd = make_two_contig_archive()
         with tempfile.TemporaryDirectory() as tmpdir:
             path = os.path.join(tmpdir, "genome_trees")
-            ta.dump(path)
-            ta2 = tmc.load(path)
-            assert ta2.num_contigs == 2
+            tsd.dump(path)
+            tsd2 = tmc.load(path)
+            assert tsd2.num_contigs == 2

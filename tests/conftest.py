@@ -1,10 +1,10 @@
 """
-Test fixtures and helpers for tskit_multichrom tests.
+Test fixtures and helpers for tsdict tests.
 """
 
 import numpy as np
 import tskit
-import tskit_multichrom as tmc
+import tsdict as tmc
 
 
 CONTIG_SCHEMA = {
@@ -104,7 +104,7 @@ def make_ts(
 
 
 def make_two_contig_archive(mark_shared=True, num_samples=4):
-    """Return a TreesAssemblage with two autosomes."""
+    """Return a TreeSequenceDictionary with two autosomes."""
     ts1 = make_ts(
         seq_len=1000,
         num_samples=num_samples,
@@ -117,7 +117,7 @@ def make_two_contig_archive(mark_shared=True, num_samples=4):
         contig_meta={"index": 1, "id": 1, "symbol": "chr2", "type": "A"},
         mark_shared=mark_shared,
     )
-    return tmc.TreesAssemblage(
+    return tmc.TreeSequenceDictionary(
         {
             tmc.ContigKey(0, 0, "chr1", "A"): ts1,
             tmc.ContigKey(1, 1, "chr2", "A"): ts2,
@@ -127,7 +127,7 @@ def make_two_contig_archive(mark_shared=True, num_samples=4):
 
 def make_autosomes_plus_x_archive(num_samples=4):
     """
-    Return an A/A/X TreesAssemblage where chrX has fewer sample nodes.
+    Return an A/A/X TreeSequenceDictionary where chrX has fewer sample nodes.
 
     chr1/chr2 have shared sample nodes 0..num_samples-1.
     chrX keeps only the first half as samples/shared; the rest are nonsample,
@@ -182,4 +182,4 @@ def make_autosomes_plus_x_archive(num_samples=4):
             tables.nodes.flags = flags
         result[key] = tables.tree_sequence()
 
-    return tmc.TreesAssemblage(result)
+    return tmc.TreeSequenceDictionary(result)

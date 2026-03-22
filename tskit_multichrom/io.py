@@ -1,5 +1,5 @@
 """
-Input/output functions for TreesAssemblage.
+Input/output functions for TreeSequenceDictionary.
 
 A trees archive can be stored in two formats:
 
@@ -24,7 +24,7 @@ import zipfile
 import tskit
 import tszip
 
-from .core import ContigKey, TreesAssemblage, make_contig_key
+from .core import ContigKey, TreeSequenceDictionary, make_contig_key
 from .flags import CONTIG_METADATA_KEY
 
 
@@ -110,7 +110,7 @@ def _load_tree_sequences_from_zip(path):
 
 def load(path):
     """
-    Load a :class:`~tskit_multichrom.TreesAssemblage` from a trees archive.
+    Load a :class:`~tskit_multichrom.TreeSequenceDictionary` from a trees archive.
 
     The archive may be:
 
@@ -124,7 +124,7 @@ def load(path):
 
     Returns
     -------
-    TreesAssemblage
+    TreeSequenceDictionary
     """
     path = str(path)
 
@@ -138,12 +138,12 @@ def load(path):
             "(expected a directory or a zip file)"
         )
 
-    return TreesAssemblage(tree_sequences)
+    return TreeSequenceDictionary(tree_sequences)
 
 
 def dump(assemblage, path, *, compress=False):
     """
-    Save a :class:`~tskit_multichrom.TreesAssemblage` to a trees archive.
+    Save a :class:`~tskit_multichrom.TreeSequenceDictionary` to a trees archive.
 
     Two output modes are available, selected by the *path* argument:
 
@@ -157,7 +157,7 @@ def dump(assemblage, path, *, compress=False):
 
     Parameters
     ----------
-    assemblage : TreesAssemblage
+    assemblage : TreeSequenceDictionary
     path : str or path-like
         Destination path (directory or zip file).
     compress : bool
