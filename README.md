@@ -4,7 +4,8 @@ A Python library for efficiently storing and analyzing multiple chromosomes (con
 
 ## Why tsdict?
 
-Population genetics simulators like **msprime** and **SLiM** (prior to v5) typically produce separate tree sequences for each chromosome. `tsdict` provides:
+Population genetics simulators like **msprime** and **SLiM** (prior to v5), and inference packages like **tsinfer**
+typically produce separate tree sequences for each chromosome. `tsdict` provides:
 
 - **Unified storage**: Manage multiple per-chromosome tree sequences as a single `TreeSequenceDictionary` object
 - **Cross-chromosome analysis**: Compute statistics across all chromosomes when samples are shared (e.g., diversity, PCA)
