@@ -1,6 +1,6 @@
 # tsdict
 
-A Python library for efficiently storing and analyzing multiple chromosomes (contigs) using [tskit](https://tskit.dev). It allows you to work with a collection of tree sequences — one per chromosome — as a unified object while maintaining cross-chromosome sample identity.
+A Python library for efficiently storing and analyzing multiple chromosomes (contigs) using [tskit](https://tskit.dev). It allows you to work with a collection of tree sequences — one per chromosome — as a unified dictionary object while maintaining cross-chromosome sample identity.
 
 ## Why tsdict?
 
