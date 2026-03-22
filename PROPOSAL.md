@@ -11,7 +11,7 @@ We refer to a folder of associated tree sequences as a "trees archive" (already 
 Key points:
 
 * The library is a thin Python wrapper around a dictionary of tree sequences, with the component tree sequences containing some shared data (e.g. they all have identical individuals tables)
-* The dictionary values are tree sequences, with keys being namedtuples of (`index`, `id`, `symbol`, `type`) - the first 3 must be unique: `index` and `id` are integers, `symbol` and `type` are strings. However, component tree sequences can more easily be accessed via `id` or `symbol` using e.g. `ta.contig("X")`
+* The dictionary values are tree sequences, with keys being namedtuples of (`index`, `id`, `symbol`, `type`) - the first 3 must be unique: `index` and `id` are integers, `symbol` and `type` are strings. However, component tree sequences can more easily be accessed via `id` or `symbol` using e.g. `tsd.contig("X")`
 * We aim to maintain SLiM compatibility as far as possible
 * We want to support a mix of presence and absence of cross chromosomal phasing (e.g. if there are parent/child trios in a dataset, the children can be phased across chromosomes, but that may not be possible for the parents)
 * Stats with `sample_sets` parameter can work across all contigs, but only if the provided sample nodes are globally phased (i.e., correspond between chromosomes); in cases where all sample nodes are globally phased in all the chromosomes, the `sample_sets` parameter can be omitted and defaults to all global samples
@@ -59,13 +59,13 @@ Caching (also performed when creating a new archive via .subset)
 1. ✅ We cache the total_sequence_length of all contigs. Note that this might overcount genome size, e.g. it adds *both* X and Y lengths to the total.
 2. ✅ We calculate a cache of the IDs of nodes which are cross-phased over all the contigs. These IDs are valid for use in whole-genome statistical calculations. 
 3. ✅ We also count the number of "nonglobal sample nodes": i.e. nodes that are samples but not shared (cross-phased) in one or more contigs. If there are any nonglobal sample nodes, we can't easily refer to a single sample set. An archive with any nonglobal sample nodes is called a nonglobal-sample ARG. (This term is specifically about sample nodes; nonsample nodes may be non-cross-phased in any case.)
-4. ✅ We cache (and index) contig metadata information so that it is easy to refer to the tree sequences corresponding to individual contigs, e.g. via `ta.contig("X")`
+4. ✅ We cache (and index) contig metadata information so that it is easy to refer to the tree sequences corresponding to individual contigs, e.g. via `tsd.contig("X")`
 
 ### Subsetting
 
 ✅ **IMPLEMENTED**
 
-We should be able to create a new archive by subsetting. This allows us to create an object without any nonglobal sample nodes (for example, all the autosomes using `ta.subset(type="A")`). The subsetting can be done entirely in-memory, and should not require making a copy of the underlying tree sequences, so should be cheap. It should only require re-running the caching process (above).
+We should be able to create a new archive by subsetting. This allows us to create an object without any nonglobal sample nodes (for example, all the autosomes using `tsd.subset(type="A")`). The subsetting can be done entirely in-memory, and should not require making a copy of the underlying tree sequences, so should be cheap. It should only require re-running the caching process (above).
 
 ### Reindexing
 
@@ -141,14 +141,14 @@ arguments may not be appropriate)
 
 ✅ **PARTIALLY IMPLEMENTED**
 
-* ✅ Stats with `sample_sets` parameter (e.g. `ta.stats.diversity(sample_sets=[[3,4,5,6]])`) can work across all contigs, but only if sample node IDs are globally phased. Basic stats like `diversity()` are implemented
+* ✅ Stats with `sample_sets` parameter (e.g. `tsd.stats.diversity(sample_sets=[[3,4,5,6]])`) can work across all contigs, but only if sample node IDs are globally phased. Basic stats like `diversity()` are implemented
   - ❌ Windowing support is not yet implemented for cross-contig stats (raises NotImplementedError)
   - ❌ Other cross-contig stats methods not yet implemented
-* ✅ `ta.shared_node_ids` property provides globally shared node IDs
+* ✅ `tsd.shared_node_ids` property provides globally shared node IDs
 * ✅ `global_phased_node_ids` property lists globally phased node IDs
-* ✅ Contig accessor: `ta.contig(id_or_symbol)` — access by integer id, symbol, or index
-* ✅ Iterator: `for key, ts in ta.items():`
-* ✅ Dictionary-like interface: `ta.keys()`, `ta.values()`, `ta[key]`
+* ✅ Contig accessor: `tsd.contig(id_or_symbol)` — access by integer id, symbol, or index
+* ✅ Iterator: `for key, ts in tsd.items():`
+* ✅ Dictionary-like interface: `tsd.keys()`, `tsd.values()`, `tsd[key]`
 * ❌ `.variants()` iterator — not yet implemented
 * ❌ `.trees()` iterator — not yet implemented
 * ❌ Recapitation support (combining multi-chromosome SLiM tree sequences from parallel msprime simulations) — not yet implemented; would use `union` or similar
@@ -174,7 +174,7 @@ arguments may not be appropriate)
 - ✅ Reorder contigs by specifying desired order
 
 ### Conversion Functions (✅ Complete)
-- ✅ ta.to_ts() — merge TreeSequenceDictionary into single TreeSequence
+- ✅ tsd.to_ts() — merge TreeSequenceDictionary into single TreeSequence
 - ✅ from_ts() — split single TreeSequence into TreeSequenceDictionary
 - ✅ from_slim() — convert SLiM-style tree sequences to TreeSequenceDictionary
 - ✅ from_tree_sequences() — create assemblage from list of tree sequences
@@ -185,7 +185,7 @@ arguments may not be appropriate)
 - ❌ Other cross-contig stats methods not yet implemented
 
 ### Simplification (✅ Complete)
-- ✅ ta.simplify(samples=None, *, individuals=None)
+- ✅ tsd.simplify(samples=None, *, individuals=None)
 - ✅ Supports simplification of nonglobal-sample ARGs via `individuals=[...]`
 
 ### Missing/Incomplete Features (❌)
