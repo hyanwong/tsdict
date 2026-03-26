@@ -587,8 +587,8 @@ class TreeSequenceDictionary:
             If given, simplify to retain the sample nodes belonging to these
             individual IDs. Each contig is simplified independently to the
             nodes belonging to the specified individuals, so this works even
-            when nonglobal sample nodes are present. Cannot be combined with
-            ``samples``.
+            when nonglobally phased sample nodes are present. Cannot be combined
+            with ``samples``.
         record_provenance : bool
             Whether to record provenance in each simplified tree sequence.
 
@@ -600,8 +600,8 @@ class TreeSequenceDictionary:
         ------
         ValueError
             If both ``samples`` and ``individuals`` are provided.
-            If neither is provided and the assemblage has nonglobal sample
-            nodes (:attr:`is_nonglobal_sample_arg` is ``True``).
+            If neither is provided and the assemblage has nonglobally phased
+            sample nodes (:attr:`is_nonglobal_sample_arg` is ``True``).
         """
         if samples is not None and individuals is not None:
             raise ValueError("Cannot specify both 'samples' and 'individuals'")
@@ -614,8 +614,8 @@ class TreeSequenceDictionary:
         if individuals is None and samples is None:
             if self.is_nonglobal_sample_arg:
                 raise ValueError(
-                    "Cannot simplify an assemblage with nonglobal sample nodes "
-                    "without specifying 'samples' or 'individuals'. Provide "
+                    "Cannot simplify an assemblage with nonglobally phased sample "
+                    "nodes without specifying 'samples' or 'individuals'. Provide "
                     "individuals=[...] to select which individuals to retain, or "
                     "call tsd.subset() first to restrict to fully cross-phased contigs."
                 )
