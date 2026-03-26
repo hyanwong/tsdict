@@ -4,12 +4,13 @@ Conversion functions between a :class:`TreeSequenceDictionary` and a single
 
 Overview
 --------
-**to_ts** merges all contigs into a single tree sequence by
-concatenating their genomic coordinate systems, placing contigs end-to-end.
+**to_ts** merges all contigs in a :class:`TreeSequenceDictionary` into a single
+:class:`tskit.TreeSequence` by concatenating their genomic coordinate systems,
+placing contigs end-to-end.
 Shared nodes (IS_SHARED flag) retain their IDs; non-shared nodes get new IDs.
 
-**from_ts** reverses this process, splitting the single tree
-sequence back into a TreeSequenceDictionary using the top-level metadata array that
+**from_ts** reverses this process, splitting the single :class:`tskit.TreeSequence`
+back into a :class:`TreeSequenceDictionary` using the top-level metadata array that
 records per-contig ``sequence_length``, ``num_nodes``, and ``contig``.
 
 **from_slim** converts a set of SLiM-style tree sequences (where all nodes
@@ -333,7 +334,7 @@ def from_ts(ts, record_provenance=True):
     if not isinstance(meta, dict) or _ARCHIVE_META_KEY not in meta:
         raise ValueError(
             f"Tree sequence does not have '{_ARCHIVE_META_KEY}' in top-level metadata. "
-            "Was it created by tsdict.to_ts() (or legacy tsdict.to_ts())?"
+            "Was it created by tsdict.to_ts()?"
         )
 
     contigs_meta = meta[_ARCHIVE_META_KEY]
