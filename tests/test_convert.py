@@ -7,7 +7,7 @@ import json
 import pytest
 import tskit
 
-import tsdict as tmc
+import tskit_multichrom as tmc
 from tests.conftest import make_autosomes_plus_x_archive, make_ts, make_two_contig_archive
 
 
@@ -91,7 +91,7 @@ class TestToTreeSequence:
         tsd = make_two_contig_archive()
         ts = tsd.to_ts(record_provenance=True)
         record = json.loads(ts.tables.provenances[-1].record)
-        assert record["software"]["name"] == "tsdict"
+        assert record["software"]["name"] == "tskit_multichrom"
         assert record["software"]["version"] == tmc.__version__
 
     def test_sites_are_shifted(self):
@@ -197,7 +197,7 @@ class TestFromTreeSequence:
         ts = tsd.to_ts(record_provenance=False)
         tsd2 = tmc.from_ts(ts, record_provenance=True)
         record = json.loads(tsd2.contig("chr1").tables.provenances[-1].record)
-        assert record["software"]["name"] == "tsdict"
+        assert record["software"]["name"] == "tskit_multichrom"
         assert record["software"]["version"] == tmc.__version__
 
     def test_no_archive_metadata_raises(self):

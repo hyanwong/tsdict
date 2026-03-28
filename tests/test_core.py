@@ -5,7 +5,7 @@ Tests for the TreeSequenceDictionary core class.
 import pytest
 import tskit
 
-import tsdict as tmc
+import tskit_multichrom as tmc
 from tests.conftest import make_ts, make_two_contig_archive, make_autosomes_plus_x_archive
 
 

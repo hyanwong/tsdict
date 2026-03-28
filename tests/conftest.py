@@ -4,7 +4,7 @@ Test fixtures and helpers for tsdict tests.
 
 import numpy as np
 import tskit
-import tsdict as tmc
+import tskit_multichrom as tmc
 
 
 CONTIG_SCHEMA = {

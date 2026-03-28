@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "tsdict"
+name = "tskit_multichrom"
 dynamic = ["version"]
 description = "TreeSequenceDictionary utilities for linked collections of tree sequences"
 readme = "README.md"
@@ -24,10 +24,10 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["tsdict*"]
+include = ["tskit_multichrom*"]
 
 [tool.setuptools.dynamic]
-version = {attr = "tsdict._version.tsdict_version"}
+version = {attr = "tskit_multichrom._version.tskit_multichrom_version"}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

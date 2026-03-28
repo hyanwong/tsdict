@@ -4,7 +4,7 @@ import numpy as np
 import msprime
 import pytest
 
-import tsdict as tmc
+import tskit_multichrom as tmc
 from tests.conftest import (
     make_autosomes_plus_x_archive,
     make_ts,

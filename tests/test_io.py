@@ -9,7 +9,7 @@ import zipfile
 import pytest
 import tskit
 
-import tsdict as tmc
+import tskit_multichrom as tmc
 from tests.conftest import make_two_contig_archive
 
 
