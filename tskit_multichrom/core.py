@@ -587,8 +587,8 @@ class TreeSequenceDictionary:
             If given, simplify to retain the sample nodes belonging to these
             individual IDs. Each contig is simplified independently to the
             nodes belonging to the specified individuals, so this works even
-            when nonglobal sample nodes are present. Cannot be combined with
-            ``samples``.
+            when nonglobally phased sample nodes are present. Cannot be combined
+            with ``samples``.
         record_provenance : bool
             Whether to record provenance in each simplified tree sequence.
 
@@ -600,8 +600,8 @@ class TreeSequenceDictionary:
         ------
         ValueError
             If both ``samples`` and ``individuals`` are provided.
-            If neither is provided and the assemblage has nonglobal sample
-            nodes (:attr:`is_nonglobal_sample_arg` is ``True``).
+            If neither is provided and the assemblage has nonglobally
+            phased sample nodes (:attr:`is_nonglobal_sample_arg` is ``True``).
         """
         if samples is not None and individuals is not None:
             raise ValueError("Cannot specify both 'samples' and 'individuals'")
@@ -620,8 +620,8 @@ class TreeSequenceDictionary:
                     "call tsd.subset() first to restrict to fully cross-phased contigs."
                 )
             # Consistent ordering across all contigs: sort globally phased node IDs.
-            # Since there are no nonglobal sample nodes, every sample in every
-            # contig is in global_phased_node_ids.
+            # As there are no nonglobally phased sample nodes, every sample in
+            # every contig is in global_phased_node_ids.
             base_samples = sorted(self.global_phased_node_ids)
 
         if samples is not None:
@@ -629,9 +629,9 @@ class TreeSequenceDictionary:
             nonglobal = [s for s in samples if s not in global_phased]
             if nonglobal:
                 raise ValueError(
-                    f"All node IDs in 'samples' must be globally phased. "
-                    f"Non-global node IDs: {nonglobal}. Use 'individuals=' to "
-                    f"simplify by individual across contigs with nonglobal nodes."
+                    f"All node IDs in 'samples' must be globally phased. Non-global "
+                    f"node IDs: {nonglobal}. Use 'individuals=' to simplify by "
+                    f"individual across contigs with nonglobally phased nodes."
                 )
 
         new_ts_dict = {}
