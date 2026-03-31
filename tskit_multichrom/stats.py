@@ -1,4 +1,9 @@
-"""Statistics helpers for TreeSequenceDictionary."""
+"""
+Statistics helpers for TreeSequenceDictionary.
+
+These methods should map to the equivalent tskit methods, but
+work by averaging over chromosomes
+"""
 
 import numpy as np
 
@@ -14,9 +19,9 @@ class TreeSequenceDictionaryStats:
         Resolve and validate ``sample_sets`` for multi-contig statistics.
 
         Rules:
-        - If ``sample_sets is None`` and there are no nonglobal samples,
-          default to one sample set containing all ``global_phased_node_ids``.
-        - If ``sample_sets is None`` and nonglobal samples exist, raise.
+        - If ``sample_sets is None`` and all samples are globally phased (no nonglobal
+          samples), default to one sample set containing all ``global_phased_node_ids``.
+        - If ``sample_sets is None`` and nonglobal samples exist, raise :class:`ValueError`.
         - If ``sample_sets`` is provided, every sample ID must be globally phased.
         """
         global_phased = set(self._tsd.global_phased_node_ids)
@@ -71,7 +76,7 @@ class TreeSequenceDictionaryStats:
             values.append(
                 ts.diversity(
                     sample_sets=effective_sample_sets,
-                    windows=None,
+                    windows=windows,
                     mode=mode,
                     span_normalise=span_normalise,
                 )
@@ -147,9 +152,9 @@ class TreeSequenceDictionaryStats:
 
         Notes
         -----
-        TODO: A more efficient implementation could combine per-contig PCA
-        results mathematically (via a block-structured GRM), avoiding the cost
-        of materialising ``to_ts()`` for large assemblages.
+        TODO: A more efficient implementation would run matvec operation
+        for each contig and combine results across contigs,
+        avoiding the cost of materialising ``to_ts()`` for large cases.
         """
         if samples is not None and individuals is not None:
             raise ValueError("Cannot specify both samples and individuals")
@@ -166,6 +171,7 @@ class TreeSequenceDictionaryStats:
             # tskit's pca requires sample node IDs to be contiguous [0, n).
             # to_ts() may interleave ancestral nodes among non-shared sample
             # nodes, so simplify first to compact sample IDs.
+            # TODO: make ts.pca() more flexible to remove this requirement?
             ts = ts.simplify(samples=ts.samples(), record_provenance=False)
             return ts.pca(
                 num_components=num_components,
