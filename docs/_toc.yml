@@ -1,0 +1,13 @@
+format: jb-book
+root: index
+parts:
+  - caption: Getting Started
+    chapters:
+      - file: installation
+      - file: usage
+  - caption: API Reference
+    chapters:
+      - file: api
+  - caption: Miscellaneous
+    chapters:
+      - file: development

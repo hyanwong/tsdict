@@ -71,9 +71,26 @@ class TreeSequenceDictionary:
     def validate(tree_sequences):
         """
         Validate consistency requirements across a dict of tree sequences.
-        The dict does not need to be in any particular order,
-        but the keys must be ContigKey instances and
-        the values must be tskit.TreeSequence instances.
+
+        The dict does not need to be in any particular order.
+        Raises :class:`ValueError` or :class:`TypeError` if any requirement
+        is violated.
+
+        Parameters
+        ----------
+        tree_sequences : dict[ContigKey, tskit.TreeSequence]
+            Mapping of contig keys to tree sequences to validate.
+
+        Raises
+        ------
+        TypeError
+            If keys are not :class:`ContigKey` or values are not
+            :class:`tskit.TreeSequence`.
+        ValueError
+            If contig index/id/symbol values are not unique, individual or
+            population tables are not identical across contigs, migration
+            tables are non-empty, time units differ, node metadata schemas
+            differ, or shared-node identity is violated.
         """
         TreeSequenceDictionary._check_tree_sequence_mapping(tree_sequences)
         if len(tree_sequences) == 0:
@@ -341,15 +358,15 @@ class TreeSequenceDictionary:
     # ------------------------------------------------------------------
 
     def keys(self):
-        """Return ContigKeys sorted by index (like dict.keys(), but as a list)."""
+        """Iterate over ContigKeys in index order."""
         return self._tree_sequences.keys()
 
     def values(self):
-        """Return tree sequences sorted by contig index (like dict.values(), but as a list)."""
+        """Iterate over tree sequences in contig index order."""
         return self._tree_sequences.values()
 
     def items(self):
-        """Return (ContigKey, TreeSequence) pairs sorted by index (like dict.items(), but as a list)."""
+        """Iterate over (ContigKey, TreeSequence) pairs in index order."""
         return self._tree_sequences.items()
 
     def __iter__(self):
