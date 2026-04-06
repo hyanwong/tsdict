@@ -1,12 +1,12 @@
-# tskit_multichrom
+# tsgroup
 
 A Python library for efficiently storing and analysing multiple chromosomes
 (contigs) using [tskit](https://tskit.dev).
 
-The central object is {class}`~tskit_multichrom.TreeSequenceDictionary`
+The central object is {class}`~tsgroup.TreeSequenceGroup`
 (abbreviated `tsd`), which holds a collection of
 {class}`tskit.TreeSequence` objects — one per contig — in a dictionary keyed
-by {class}`~tskit_multichrom.ContigKey` named-tuples.  It provides:
+by {class}`~tsgroup.ContigKey` named-tuples.  It provides:
 
 - **Unified storage** — manage all chromosomes as a single object.
 - **Cross-chromosome statistics** — compute diversity, PCA, etc. over shared

@@ -3,8 +3,8 @@
 ## Setting up a development environment
 
 ```bash
-git clone https://github.com/hyanwong/tsdict.git
-cd tsdict
+git clone https://github.com/hyanwong/tsgroup.git
+cd tsgroup
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
@@ -19,7 +19,7 @@ pytest
 Coverage report:
 
 ```bash
-pytest --cov=tskit_multichrom --cov-report=html
+pytest --cov=tsgroup --cov-report=html
 ```
 
 ## Code style
@@ -43,4 +43,4 @@ make
 ## Contributing
 
 Please open issues and pull requests on the
-[GitHub repository](https://github.com/hyanwong/tsdict).
+[GitHub repository](https://github.com/hyanwong/tsgroup).

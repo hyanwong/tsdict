@@ -3,14 +3,14 @@
 ## From PyPI
 
 ```bash
-pip install tskit_multichrom
+pip install tsgroup
 ```
 
 ## From source
 
 ```bash
-git clone https://github.com/hyanwong/tsdict.git
-cd tsdict
+git clone https://github.com/hyanwong/tsgroup.git
+cd tsgroup
 pip install -e ".[dev]"
 ```
 

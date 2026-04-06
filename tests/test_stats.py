@@ -1,10 +1,10 @@
-"""Tests for TreeSequenceDictionary stats methods."""
+"""Tests for TreeSequenceGroup stats methods."""
 
 import numpy as np
 import msprime
 import pytest
 
-import tskit_multichrom as tmc
+import tsgroup
 from tests.conftest import (
     make_autosomes_plus_x_archive,
     make_ts,
@@ -28,17 +28,17 @@ def _make_two_contig_archive_shared_samples_only():
 
     result = {}
     for key, ts in [
-        (tmc.ContigKey(0, 0, "chr1", "A"), ts1),
-        (tmc.ContigKey(1, 1, "chr2", "A"), ts2),
+        (tsgroup.ContigKey(0, 0, "chr1", "A"), ts1),
+        (tsgroup.ContigKey(1, 1, "chr2", "A"), ts2),
     ]:
         tables = ts.dump_tables()
         flags = tables.nodes.flags.copy()
         sample_ids = ts.samples()
-        flags[sample_ids] = flags[sample_ids] | tmc.NODE_IS_SHARED
+        flags[sample_ids] = flags[sample_ids] | tsgroup.NODE_IS_SHARED
         tables.nodes.flags = flags
         result[key] = tables.tree_sequence()
 
-    return tmc.TreeSequenceDictionary(result)
+    return tsgroup.TreeSequenceGroup(result)
 
 
 def _add_mutations_to_archive(tsd, rate=0.05):
@@ -46,7 +46,7 @@ def _add_mutations_to_archive(tsd, rate=0.05):
     mutated = {}
     for i, (key, ts) in enumerate(tsd.items()):
         mutated[key] = msprime.sim_mutations(ts, rate=rate, random_seed=1000 + i)
-    return tmc.TreeSequenceDictionary(mutated)
+    return tsgroup.TreeSequenceGroup(mutated)
 
 
 class TestDiversity:
@@ -88,7 +88,7 @@ class TestDiversity:
             tsd.stats.diversity(windows=[0, 100])
 
     def test_diversity_empty_raises(self):
-        tsd = tmc.TreeSequenceDictionary({})
+        tsd = tsgroup.TreeSequenceGroup({})
         with pytest.raises(ValueError, match="empty"):
             tsd.stats.diversity()
 

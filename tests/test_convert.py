@@ -1,5 +1,5 @@
 """
-Tests for conversion between TreeSequenceDictionary and a single TreeSequence.
+Tests for conversion between TreeSequenceGroup and a single TreeSequence.
 """
 
 import json
@@ -7,7 +7,7 @@ import json
 import pytest
 import tskit
 
-import tskit_multichrom as tmc
+import tsgroup
 from tests.conftest import make_autosomes_plus_x_archive, make_ts, make_two_contig_archive
 
 
@@ -33,7 +33,7 @@ class TestToTreeSequence:
         assert "chr2" in symbols
 
     def test_empty_raises(self):
-        tsd = tmc.TreeSequenceDictionary({})
+        tsd = tsgroup.TreeSequenceGroup({})
         with pytest.raises(ValueError, match="empty"):
             tsd.to_ts()
 
@@ -52,10 +52,10 @@ class TestToTreeSequence:
             {"codec": "json", "type": "object", "properties": {"x": {"type": "integer"}}}
         )
         ts2_mod = tables.tree_sequence()
-        tsd = tmc.TreeSequenceDictionary(
+        tsd = tsgroup.TreeSequenceGroup(
             {
-                tmc.ContigKey(0, 0, "c1", "A"): ts1,
-                tmc.ContigKey(1, 1, "c2", "A"): ts2_mod,
+                tsgroup.ContigKey(0, 0, "c1", "A"): ts1,
+                tsgroup.ContigKey(1, 1, "c2", "A"): ts2_mod,
             }
         )
         with pytest.raises(ValueError, match="[Ss]ite"):
@@ -69,7 +69,7 @@ class TestToTreeSequence:
         # Nodes 0..4 (4 samples + 1 ancestral) should all have IS_SHARED set
         for node_id in range(5):
             flags = ts.tables.nodes[node_id].flags
-            assert flags & tmc.NODE_IS_SHARED
+            assert flags & tsgroup.NODE_IS_SHARED
 
     def test_sequence_length(self):
         tsd = make_two_contig_archive()
@@ -91,8 +91,8 @@ class TestToTreeSequence:
         tsd = make_two_contig_archive()
         ts = tsd.to_ts(record_provenance=True)
         record = json.loads(ts.tables.provenances[-1].record)
-        assert record["software"]["name"] == "tskit_multichrom"
-        assert record["software"]["version"] == tmc.__version__
+        assert record["software"]["name"] == "tsgroup"
+        assert record["software"]["version"] == tsgroup.__version__
 
     def test_sites_are_shifted(self):
         """Sites from chr2 should be shifted by chr1's sequence_length."""
@@ -113,10 +113,10 @@ class TestToTreeSequence:
         tables2.sites.add_row(position=500.0, ancestral_state="T")
         ts2 = tables2.tree_sequence()
 
-        tsd = tmc.TreeSequenceDictionary(
+        tsd = tsgroup.TreeSequenceGroup(
             {
-                tmc.ContigKey(0, 0, "chr1", "A"): ts1,
-                tmc.ContigKey(1, 1, "chr2", "A"): ts2,
+                tsgroup.ContigKey(0, 0, "chr1", "A"): ts1,
+                tsgroup.ContigKey(1, 1, "chr2", "A"): ts2,
             }
         )
         merged = tsd.to_ts()
@@ -154,51 +154,51 @@ class TestFromTreeSequence:
     def test_roundtrip(self):
         tsd = make_two_contig_archive()
         ts = tsd.to_ts()
-        tsd2 = tmc.from_ts(ts)
+        tsd2 = tsgroup.from_ts(ts)
         assert tsd2.num_contigs == 2
 
     def test_roundtrip_sequence_lengths(self):
         tsd = make_two_contig_archive()
         ts = tsd.to_ts()
-        tsd2 = tmc.from_ts(ts)
+        tsd2 = tsgroup.from_ts(ts)
         assert tsd2.contig("chr1").sequence_length == 1000
         assert tsd2.contig("chr2").sequence_length == 2000
 
     def test_roundtrip_contig_metadata(self):
         tsd = make_two_contig_archive()
         ts = tsd.to_ts()
-        tsd2 = tmc.from_ts(ts)
-        meta = tsd2.contig("chr1").metadata[tmc.CONTIG_METADATA_KEY]
+        tsd2 = tsgroup.from_ts(ts)
+        meta = tsd2.contig("chr1").metadata[tsgroup.CONTIG_METADATA_KEY]
         assert meta["symbol"] == "chr1"
         assert meta["index"] == 0
 
     def test_record_provenance_kwarg(self):
         tsd = make_two_contig_archive()
         ts = tsd.to_ts()
-        tsd2 = tmc.from_ts(ts, record_provenance=False)
+        tsd2 = tsgroup.from_ts(ts, record_provenance=False)
         assert tsd2.num_contigs == 2
 
     def test_from_ts_record_provenance_false(self):
         tsd = make_two_contig_archive()
         ts = tsd.to_ts(record_provenance=False)
-        tsd2 = tmc.from_ts(ts, record_provenance=False)
+        tsd2 = tsgroup.from_ts(ts, record_provenance=False)
         assert tsd2.contig("chr1").num_provenances == 0
         assert tsd2.contig("chr2").num_provenances == 0
 
     def test_from_ts_record_provenance_true(self):
         tsd = make_two_contig_archive()
         ts = tsd.to_ts(record_provenance=False)
-        tsd2 = tmc.from_ts(ts, record_provenance=True)
+        tsd2 = tsgroup.from_ts(ts, record_provenance=True)
         assert tsd2.contig("chr1").num_provenances == 1
         assert tsd2.contig("chr2").num_provenances == 1
 
     def test_from_ts_record_provenance_true_entry_has_version(self):
         tsd = make_two_contig_archive()
         ts = tsd.to_ts(record_provenance=False)
-        tsd2 = tmc.from_ts(ts, record_provenance=True)
+        tsd2 = tsgroup.from_ts(ts, record_provenance=True)
         record = json.loads(tsd2.contig("chr1").tables.provenances[-1].record)
-        assert record["software"]["name"] == "tskit_multichrom"
-        assert record["software"]["version"] == tmc.__version__
+        assert record["software"]["name"] == "tsgroup"
+        assert record["software"]["version"] == tsgroup.__version__
 
     def test_no_archive_metadata_raises(self):
         tables = tskit.TableCollection(sequence_length=1000)
@@ -208,7 +208,7 @@ class TestFromTreeSequence:
         tables.metadata = {}
         ts = tables.tree_sequence()
         with pytest.raises(ValueError, match="contigs"):
-            tmc.from_ts(ts)
+            tsgroup.from_ts(ts)
 
     def test_roundtrip_is_vacant_bits_reconstruct_samples(self):
         """Verify is_vacant bits properly reconstruct sample markings in roundtrip."""
@@ -220,7 +220,7 @@ class TestFromTreeSequence:
 
         # Roundtrip: to_ts encodes is_vacant bits, from_ts should decode them
         merged = tsd.to_ts()
-        reconstructed = tmc.from_ts(merged)
+        reconstructed = tsgroup.from_ts(merged)
 
         # Verify sample markings are correctly restored
         for key in tsd.contigs:
@@ -276,30 +276,30 @@ class TestFromSlim:
     def test_basic(self):
         ts1 = self._make_slim_ts(0, 0, "chr1", "A", 1000)
         ts2 = self._make_slim_ts(1, 1, "chr2", "A", 2000)
-        tsd = tmc.from_slim([ts1, ts2])
+        tsd = tsgroup.from_slim([ts1, ts2])
         assert tsd.num_contigs == 2
         assert tsd.contig("chr1").sequence_length == 1000
         assert tsd.contig("chr2").sequence_length == 2000
 
     def test_nodes_marked_shared(self):
         ts1 = self._make_slim_ts(0, 0, "chr1", "A", 1000)
-        tsd = tmc.from_slim([ts1])
+        tsd = tsgroup.from_slim([ts1])
         ts = tsd.contig("chr1")
         for nid in range(ts.num_nodes):
-            assert ts.tables.nodes[nid].flags & tmc.NODE_IS_SHARED
+            assert ts.tables.nodes[nid].flags & tsgroup.NODE_IS_SHARED
 
     def test_contig_metadata_added(self):
         ts1 = self._make_slim_ts(0, 0, "chr1", "A", 1000)
-        tsd = tmc.from_slim([ts1])
+        tsd = tsgroup.from_slim([ts1])
         meta = tsd.contig("chr1").metadata
-        assert tmc.CONTIG_METADATA_KEY in meta
-        assert meta[tmc.CONTIG_METADATA_KEY]["symbol"] == "chr1"
+        assert tsgroup.CONTIG_METADATA_KEY in meta
+        assert meta[tsgroup.CONTIG_METADATA_KEY]["symbol"] == "chr1"
 
     def test_missing_slim_metadata_raises(self):
         tables = tskit.TableCollection(sequence_length=1000)
         ts = tables.tree_sequence()
         with pytest.raises(ValueError, match="SLiM"):
-            tmc.from_slim([ts])
+            tsgroup.from_slim([ts])
 
     def test_missing_this_chromosome_raises(self):
         tables = tskit.TableCollection(sequence_length=1000)
@@ -308,7 +308,7 @@ class TestFromSlim:
         tables.metadata = {"SLiM": {"other_key": 1}}
         ts = tables.tree_sequence()
         with pytest.raises(ValueError, match="this_chromosome"):
-            tmc.from_slim([ts])
+            tsgroup.from_slim([ts])
 
 
 class TestFromTreeSequences:
@@ -316,7 +316,7 @@ class TestFromTreeSequences:
         """Test basic construction with default shared_nodes=None."""
         ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
         ts2 = make_ts(seq_len=2000, num_samples=4, mark_shared=False)
-        tsd = tmc.from_tree_sequences(
+        tsd = tsgroup.from_tree_sequences(
             [ts1, ts2],
             ids=[20, 21],
             symbols=["20", "21"],
@@ -329,7 +329,7 @@ class TestFromTreeSequences:
     def test_default_shared_nodes_none(self):
         """Test that the default shared_nodes=None marks no nodes as IS_SHARED."""
         ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
-        tsd = tmc.from_tree_sequences(
+        tsd = tsgroup.from_tree_sequences(
             [ts1],
             ids=[1],
             symbols=["chr1"],
@@ -338,13 +338,13 @@ class TestFromTreeSequences:
         ts = tsd.contig("chr1")
         # Verify that no nodes have IS_SHARED marked
         for nid in range(ts.num_nodes):
-            assert not (ts.tables.nodes[nid].flags & tmc.NODE_IS_SHARED)
+            assert not (ts.tables.nodes[nid].flags & tsgroup.NODE_IS_SHARED)
 
     def test_contig_keys_created(self):
         """Test that ContigKey objects are created with correct values."""
         ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
         ts2 = make_ts(seq_len=2000, num_samples=4, mark_shared=False)
-        tsd = tmc.from_tree_sequences(
+        tsd = tsgroup.from_tree_sequences(
             [ts1, ts2],
             ids=[20, 21],
             symbols=["chr20", "chr21"],
@@ -352,15 +352,15 @@ class TestFromTreeSequences:
             indexes=[10, 11],
             shared_nodes="samples",
         )
-        key1 = tmc.ContigKey(index=10, id=20, symbol="chr20", type="A")
-        key2 = tmc.ContigKey(index=11, id=21, symbol="chr21", type="A")
+        key1 = tsgroup.ContigKey(index=10, id=20, symbol="chr20", type="A")
+        key2 = tsgroup.ContigKey(index=11, id=21, symbol="chr21", type="A")
         assert key1 in tsd
         assert key2 in tsd
 
     def test_sample_nodes_marked_shared(self):
         """Test that sample nodes are marked as IS_SHARED when shared_nodes='samples'."""
         ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
-        tsd = tmc.from_tree_sequences(
+        tsd = tsgroup.from_tree_sequences(
             [ts1],
             ids=[1],
             symbols=["chr1"],
@@ -370,12 +370,12 @@ class TestFromTreeSequences:
         ts = tsd.contig("chr1")
         sample_ids = ts.samples()
         for sample_id in sample_ids:
-            assert ts.tables.nodes[sample_id].flags & tmc.NODE_IS_SHARED
+            assert ts.tables.nodes[sample_id].flags & tsgroup.NODE_IS_SHARED
 
     def test_non_sample_nodes_not_marked_shared(self):
         """Test that non-sample nodes are not marked as IS_SHARED when shared_nodes='samples'."""
         ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
-        tsd = tmc.from_tree_sequences(
+        tsd = tsgroup.from_tree_sequences(
             [ts1],
             ids=[1],
             symbols=["chr1"],
@@ -386,14 +386,14 @@ class TestFromTreeSequences:
         sample_ids = set(ts.samples())
         for nid in range(ts.num_nodes):
             if nid not in sample_ids:
-                assert not (ts.tables.nodes[nid].flags & tmc.NODE_IS_SHARED)
+                assert not (ts.tables.nodes[nid].flags & tsgroup.NODE_IS_SHARED)
 
     def test_list_of_node_ids_marked_shared(self):
         """Test marking a specific list of node IDs as IS_SHARED."""
         ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
         # ts1 has 5 nodes: 4 samples and 1 ancestor
         shared_node_ids = [0, 1, 4]  # Mark first two samples and the ancestor
-        tsd = tmc.from_tree_sequences(
+        tsd = tsgroup.from_tree_sequences(
             [ts1],
             ids=[1],
             symbols=["chr1"],
@@ -403,16 +403,16 @@ class TestFromTreeSequences:
         ts = tsd.contig("chr1")
         # Check that specified nodes have IS_SHARED set
         for nid in shared_node_ids:
-            assert ts.tables.nodes[nid].flags & tmc.NODE_IS_SHARED, f"Node {nid} not marked"
+            assert ts.tables.nodes[nid].flags & tsgroup.NODE_IS_SHARED, f"Node {nid} not marked"
         # Check that unspecified nodes do not have IS_SHARED
         for nid in [2, 3]:
-            assert not (ts.tables.nodes[nid].flags & tmc.NODE_IS_SHARED), f"Node {nid} marked"
+            assert not (ts.tables.nodes[nid].flags & tsgroup.NODE_IS_SHARED), f"Node {nid} marked"
 
     def test_default_indexes(self):
         """Test that indexes default to [0, 1, 2, ...] when not provided."""
         ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
         ts2 = make_ts(seq_len=2000, num_samples=4, mark_shared=False)
-        tsd = tmc.from_tree_sequences(
+        tsd = tsgroup.from_tree_sequences(
             [ts1, ts2],
             ids=[20, 21],
             symbols=["20", "21"],
@@ -427,7 +427,7 @@ class TestFromTreeSequences:
         """Test that custom indexes are respected."""
         ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
         ts2 = make_ts(seq_len=2000, num_samples=4, mark_shared=False)
-        tsd = tmc.from_tree_sequences(
+        tsd = tsgroup.from_tree_sequences(
             [ts1, ts2],
             ids=[20, 21],
             symbols=["20", "21"],
@@ -441,7 +441,7 @@ class TestFromTreeSequences:
     def test_empty_list_raises(self):
         """Test that empty tree_sequences list raises ValueError."""
         with pytest.raises(ValueError, match="empty"):
-            tmc.from_tree_sequences(
+            tsgroup.from_tree_sequences(
                 [],
                 ids=[],
                 symbols=[],
@@ -453,7 +453,7 @@ class TestFromTreeSequences:
         ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
         ts2 = make_ts(seq_len=2000, num_samples=4, mark_shared=False)
         with pytest.raises(ValueError, match="ids.*same length"):
-            tmc.from_tree_sequences(
+            tsgroup.from_tree_sequences(
                 [ts1, ts2],
                 ids=[20],  # Only one id instead of two
                 symbols=["20", "21"],
@@ -465,7 +465,7 @@ class TestFromTreeSequences:
         ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
         ts2 = make_ts(seq_len=2000, num_samples=4, mark_shared=False)
         with pytest.raises(ValueError, match="symbols.*same length"):
-            tmc.from_tree_sequences(
+            tsgroup.from_tree_sequences(
                 [ts1, ts2],
                 ids=[20, 21],
                 symbols=["20"],  # Only one symbol instead of two
@@ -477,7 +477,7 @@ class TestFromTreeSequences:
         ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
         ts2 = make_ts(seq_len=2000, num_samples=4, mark_shared=False)
         with pytest.raises(ValueError, match="types.*same length"):
-            tmc.from_tree_sequences(
+            tsgroup.from_tree_sequences(
                 [ts1, ts2],
                 ids=[20, 21],
                 symbols=["20", "21"],
@@ -489,7 +489,7 @@ class TestFromTreeSequences:
         ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
         ts2 = make_ts(seq_len=2000, num_samples=4, mark_shared=False)
         with pytest.raises(ValueError, match="indexes.*same length"):
-            tmc.from_tree_sequences(
+            tsgroup.from_tree_sequences(
                 [ts1, ts2],
                 ids=[20, 21],
                 symbols=["20", "21"],
@@ -501,7 +501,7 @@ class TestFromTreeSequences:
         """Test that invalid shared_nodes string raises ValueError."""
         ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
         with pytest.raises(ValueError, match="'samples'"):
-            tmc.from_tree_sequences(
+            tsgroup.from_tree_sequences(
                 [ts1],
                 ids=[1],
                 symbols=["chr1"],
@@ -513,7 +513,7 @@ class TestFromTreeSequences:
         """Test that non-list shared_nodes raises ValueError."""
         ts1 = make_ts(seq_len=1000, num_samples=4, mark_shared=False)
         with pytest.raises(ValueError, match="list of node IDs"):
-            tmc.from_tree_sequences(
+            tsgroup.from_tree_sequences(
                 [ts1],
                 ids=[1],
                 symbols=["chr1"],

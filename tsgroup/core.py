@@ -1,5 +1,5 @@
 """
-Core TreeSequenceDictionary class for tskit_multichrom.
+Core TreeSequenceGroup class for tsgroup.
 """
 
 import collections
@@ -8,7 +8,7 @@ import numpy as np
 import tskit
 
 from .flags import CONTIG_METADATA_KEY, NODE_IS_SHARED
-from .stats import TreeSequenceDictionaryStats
+from .stats import TreeSequenceGroupStats
 
 # Named tuple representing a contig's key in the assemblage dictionary.
 # - index: ordering integer (not required to be consecutive)
@@ -18,7 +18,7 @@ from .stats import TreeSequenceDictionaryStats
 ContigKey = collections.namedtuple("ContigKey", ["index", "id", "symbol", "type"])
 
 
-class TreeSequenceDictionary:
+class TreeSequenceGroup:
     """
     A dictionary-like collection of tree sequences representing multiple contigs
     (chromosomes), with additional methods that allow manipulation or analysis of
@@ -48,7 +48,7 @@ class TreeSequenceDictionary:
             sorted(tree_sequences.items(), key=lambda item: item[0].index)
         )
         self._build_cache()
-        self._stats = TreeSequenceDictionaryStats(self)
+        self._stats = TreeSequenceGroupStats(self)
 
     # ------------------------------------------------------------------
     # Validation
@@ -92,7 +92,7 @@ class TreeSequenceDictionary:
             tables are non-empty, time units differ, node metadata schemas
             differ, or shared-node identity is violated.
         """
-        TreeSequenceDictionary._check_tree_sequence_mapping(tree_sequences)
+        TreeSequenceGroup._check_tree_sequence_mapping(tree_sequences)
         if len(tree_sequences) == 0:
             return
 
@@ -124,7 +124,7 @@ class TreeSequenceDictionary:
 
         # Check ContigKey matches top-level metadata of each tree sequence
         for key, ts in tree_sequences.items():
-            TreeSequenceDictionary._check_contig_metadata(key, ts)
+            TreeSequenceGroup._check_contig_metadata(key, ts)
 
         # Reference tree sequence (first in index order)
         ref_ts = tss[0]
@@ -173,7 +173,7 @@ class TreeSequenceDictionary:
         # Check IS_SHARED node identity: any node with IS_SHARED set must be
         # identical (flags, time, individual, population, metadata) across all
         # tree sequences that contain that node ID.
-        TreeSequenceDictionary._validate_shared_nodes(tree_sequences)
+        TreeSequenceGroup._validate_shared_nodes(tree_sequences)
 
     @staticmethod
     def _check_contig_metadata(key, ts):
@@ -425,7 +425,7 @@ class TreeSequenceDictionary:
     def __repr__(self):
         symbols = [k.symbol for k in self._tree_sequences.keys()]
         return (
-            f"TreeSequenceDictionary(contigs={symbols!r}, "
+            f"TreeSequenceGroup(contigs={symbols!r}, "
             f"total_length={self.total_sequence_length})"
         )
 
@@ -435,7 +435,7 @@ class TreeSequenceDictionary:
 
     def subset(self, *, symbols=None, type=None, types=None, ids=None, indexes=None):
         """
-        Create a new :class:`TreeSequenceDictionary` from a subset of contigs.
+        Create a new :class:`TreeSequenceGroup` from a subset of contigs.
 
         Subsetting is cheap: it does not copy the underlying tree sequences.
         Only the cache is recomputed.
@@ -456,7 +456,7 @@ class TreeSequenceDictionary:
 
         Returns
         -------
-        TreeSequenceDictionary
+        TreeSequenceGroup
         """
         keep = set(self._tree_sequences.keys())
 
@@ -481,7 +481,7 @@ class TreeSequenceDictionary:
             keep &= {k for k in keep if k.index in indexes_set}
 
         new_ts = {k: self._tree_sequences[k] for k in keep}
-        return TreeSequenceDictionary(new_ts, skip_validation=True)
+        return TreeSequenceGroup(new_ts, skip_validation=True)
 
     # ------------------------------------------------------------------
     # Reindexing
@@ -489,7 +489,7 @@ class TreeSequenceDictionary:
 
     def reindex(self, order=None):
         """
-        Return a new :class:`TreeSequenceDictionary` with contigs reindexed from 0..N-1.
+        Return a new :class:`TreeSequenceGroup` with contigs reindexed from 0..N-1.
 
         This makes copies of the underlying tree sequences with updated metadata.
 
@@ -501,7 +501,7 @@ class TreeSequenceDictionary:
 
         Returns
         -------
-        TreeSequenceDictionary
+        TreeSequenceGroup
         """
         if order is None:
             ordered_keys = list(self._tree_sequences.keys())
@@ -542,7 +542,7 @@ class TreeSequenceDictionary:
             )
             new_ts[new_key] = tables.tree_sequence()
 
-        return TreeSequenceDictionary(new_ts)
+        return TreeSequenceGroup(new_ts)
 
     # ------------------------------------------------------------------
     # I/O
@@ -552,7 +552,7 @@ class TreeSequenceDictionary:
         """
         Save this assemblage to a trees archive.
 
-        This is a convenience wrapper around :func:`tskit_multichrom.io.dump`.
+        This is a convenience wrapper around :func:`tsgroup.io.dump`.
         See that function for full documentation.
 
         Parameters
@@ -570,7 +570,7 @@ class TreeSequenceDictionary:
         """
         Merge this assemblage into a single :class:`tskit.TreeSequence`.
 
-        This is a convenience wrapper around :func:`tskit_multichrom.convert.to_ts`.
+        This is a convenience wrapper around :func:`tsgroup.convert.to_ts`.
         See that function for full documentation.
 
         Parameters
@@ -588,7 +588,7 @@ class TreeSequenceDictionary:
 
     def simplify(self, samples=None, *, individuals=None, record_provenance=True):
         """
-        Return a new simplified :class:`TreeSequenceDictionary`.
+        Return a new simplified :class:`TreeSequenceGroup`.
 
         All tree sequences in the assemblage are simplified simultaneously,
         maintaining consistent node IDs for shared nodes across contigs.
@@ -611,7 +611,7 @@ class TreeSequenceDictionary:
 
         Returns
         -------
-        TreeSequenceDictionary
+        TreeSequenceGroup
 
         Raises
         ------
@@ -624,7 +624,7 @@ class TreeSequenceDictionary:
             raise ValueError("Cannot specify both 'samples' and 'individuals'")
 
         if self.num_contigs == 0:
-            return TreeSequenceDictionary({})
+            return TreeSequenceGroup({})
 
         sorted_keys = self.contigs
 
@@ -680,7 +680,7 @@ class TreeSequenceDictionary:
                 record_provenance=record_provenance,
             )
 
-        return TreeSequenceDictionary(new_ts_dict)
+        return TreeSequenceGroup(new_ts_dict)
 
 
 # ------------------------------------------------------------------

@@ -1,5 +1,6 @@
 SPHINXOPTS    ?=
 BUILDDIR      ?= _build
+PROJECT_ROOT  := $(abspath ..)
 
 .PHONY: help html clean
 
@@ -9,7 +10,7 @@ help:
 	@echo "  clean  Remove the build directory"
 
 html:
-	jupyter-book build . $(SPHINXOPTS)
+	PYTHONPATH="$(PROJECT_ROOT):$$PYTHONPATH" jupyter-book build . $(SPHINXOPTS)
 
 clean:
 	jupyter-book clean .

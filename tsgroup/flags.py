@@ -1,5 +1,5 @@
 """
-Flag constants for tskit_multichrom.
+Flag constants for tsgroup.
 """
 
 # Node flag indicating that this node is shared (cross-phased) across all

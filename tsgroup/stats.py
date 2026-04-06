@@ -1,5 +1,5 @@
 """
-Statistics helpers for TreeSequenceDictionary.
+Statistics helpers for TreeSequenceGroup.
 
 These methods should map to the equivalent tskit methods, but
 work by averaging over chromosomes
@@ -8,11 +8,11 @@ work by averaging over chromosomes
 import numpy as np
 
 
-class TreeSequenceDictionaryStats:
-    """Statistics namespace for :class:`tskit_multichrom.core.TreeSequenceDictionary`."""
+class TreeSequenceGroupStats:
+    """Statistics namespace for :class:`tsgroup.core.TreeSequenceGroup`."""
 
-    def __init__(self, tsd):
-        self._tsd = tsd
+    def __init__(self, tsg):
+        self._tsg = tsg
 
     def _resolve_sample_sets(self, sample_sets):
         """
@@ -24,10 +24,10 @@ class TreeSequenceDictionaryStats:
         - If ``sample_sets is None`` and nonglobal samples exist, raise :class:`ValueError`.
         - If ``sample_sets`` is provided, every sample ID must be globally phased.
         """
-        global_phased = set(self._tsd.global_phased_node_ids)
+        global_phased = set(self._tsg.global_phased_node_ids)
 
         if sample_sets is None:
-            if self._tsd.nonglobal_sample_node_count != 0:
+            if self._tsg.nonglobal_sample_node_count != 0:
                 raise ValueError(
                     "sample_sets must be provided when nonglobal sample nodes are present"
                 )
@@ -65,14 +65,14 @@ class TreeSequenceDictionaryStats:
                 "tsd.stats.diversity does not yet support windows"
             )
 
-        if self._tsd.num_contigs == 0:
-            raise ValueError("Cannot compute diversity on an empty TreeSequenceDictionary")
+        if self._tsg.num_contigs == 0:
+            raise ValueError("Cannot compute diversity on an empty TreeSequenceGroup")
 
         effective_sample_sets = self._resolve_sample_sets(sample_sets)
 
         values = []
         spans = []
-        for ts in self._tsd.values():
+        for ts in self._tsg.values():
             values.append(
                 ts.diversity(
                     sample_sets=effective_sample_sets,
@@ -159,10 +159,10 @@ class TreeSequenceDictionaryStats:
         if samples is not None and individuals is not None:
             raise ValueError("Cannot specify both samples and individuals")
 
-        ts = self._tsd.to_ts()
+        ts = self._tsg.to_ts()
 
         if individuals is not None:
-            types = {key.type for key in self._tsd.contigs}
+            types = {key.type for key in self._tsg.contigs}
             if len(types) > 1:
                 raise ValueError(
                     "pca with individuals requires all contigs to be the same"
@@ -187,16 +187,16 @@ class TreeSequenceDictionaryStats:
             )
 
         if samples is None:
-            if self._tsd.is_nonglobal_sample_arg:
+            if self._tsg.is_nonglobal_sample_arg:
                 raise ValueError(
                     "individuals or samples must be provided when nonglobal"
                     " sample nodes are present"
                 )
             effective_samples = np.asarray(
-                sorted(self._tsd.global_phased_node_ids), dtype=np.int32
+                sorted(self._tsg.global_phased_node_ids), dtype=np.int32
             )
         else:
-            global_phased = set(self._tsd.global_phased_node_ids)
+            global_phased = set(self._tsg.global_phased_node_ids)
             for sid in samples:
                 if int(sid) not in global_phased:
                     raise ValueError(

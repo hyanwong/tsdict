@@ -1,1 +1,1 @@
-# tsdict tests package
+# tsgroup tests package

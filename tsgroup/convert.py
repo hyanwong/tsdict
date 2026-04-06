@@ -1,21 +1,21 @@
 """
-Conversion functions between a :class:`TreeSequenceDictionary` and a single
+Conversion functions between a :class:`TreeSequenceGroup` and a single
 :class:`tskit.TreeSequence`.
 
 Overview
 --------
-**tsd.to_ts** merges all contigs in a :class:`TreeSequenceDictionary` into a single
+**tsd.to_ts** merges all contigs in a :class:`TreeSequenceGroup` into a single
 :class:`tskit.TreeSequence` by concatenating their genomic coordinate systems,
 placing contigs end-to-end. Shared nodes (IS_SHARED flag) retain their IDs;
 non-shared nodes get new IDs.
 
-**tsdict.from_ts** reverses this process, splitting the single
-:class:`tskit.TreeSequence` back into a :class:`TreeSequenceDictionary`
+**tsgroup.from_ts** reverses this process, splitting the single
+:class:`tskit.TreeSequence` back into a :class:`TreeSequenceGroup`
 using the top-level metadata array that
 records per-contig ``sequence_length``, ``num_nodes``, and ``contig``.
 
 **from_slim** converts a set of SLiM-style tree sequences (where all nodes
-are implicitly shared) into a :class:`TreeSequenceDictionary`.
+are implicitly shared) into a :class:`TreeSequenceGroup`.
 """
 
 import copy
@@ -25,8 +25,8 @@ import json
 import numpy as np
 import tskit
 
-from ._version import tskit_multichrom_version
-from .core import ContigKey, TreeSequenceDictionary, make_contig_key
+from ._version import tsgroup_version
+from .core import ContigKey, TreeSequenceGroup, make_contig_key
 from .flags import CONTIG_METADATA_KEY, NODE_IS_SHARED
 
 # Top-level metadata key used in the single-TS representation
@@ -35,10 +35,10 @@ _ARCHIVE_META_KEY = "contigs"
 
 def to_ts(tsd, record_provenance=True):
     """
-    Merge a :class:`TreeSequenceDictionary` into a single :class:`tskit.TreeSequence`.
+    Merge a :class:`TreeSequenceGroup` into a single :class:`tskit.TreeSequence`.
 
     Contigs are placed end-to-end in order of their ``index`` values.
-    Shared nodes (those with :data:`~tskit_multichrom.flags.NODE_IS_SHARED` set)
+    Shared nodes (those with :data:`~tsgroup.flags.NODE_IS_SHARED` set)
     retain their original node IDs in the merged tree sequence. Non-shared nodes
     receive new IDs, assigned after all shared nodes have been placed.
 
@@ -47,7 +47,7 @@ def to_ts(tsd, record_provenance=True):
 
     Parameters
     ----------
-    tsd : TreeSequenceDictionary
+    tsd : TreeSequenceGroup
     record_provenance : bool
         Whether to append a provenance record for this ``to_ts`` call.
 
@@ -146,8 +146,8 @@ def to_ts(tsd, record_provenance=True):
     if record_provenance:
         provenance_record = {
             "software": {
-                "name": "tskit_multichrom",
-                "version": tskit_multichrom_version,
+                "name": "tsgroup",
+                "version": tsgroup_version,
             },
             "parameters": {
                 "command": "to_ts",
@@ -315,11 +315,11 @@ def to_ts(tsd, record_provenance=True):
 def from_ts(ts, record_provenance=True):
     """
     Convert a single merged :class:`tskit.TreeSequence` back into a
-    :class:`TreeSequenceDictionary`.
+    :class:`TreeSequenceGroup`.
 
     The input tree sequence must have been created by :func:`to_ts`
     (or equivalent), with top-level metadata containing a
-    ``'tskit_multichrom_contigs'`` array.
+    ``'tsgroup_contigs'`` array.
 
     Parameters
     ----------
@@ -329,13 +329,13 @@ def from_ts(ts, record_provenance=True):
 
     Returns
     -------
-    TreeSequenceDictionary
+    TreeSequenceGroup
     """
     meta = ts.metadata
     if not isinstance(meta, dict) or _ARCHIVE_META_KEY not in meta:
         raise ValueError(
             f"Tree sequence does not have '{_ARCHIVE_META_KEY}' in top-level metadata. "
-            "Was it created by tskit_multichrom.to_ts()?"
+            "Was it created by tsgroup.to_ts()?"
         )
 
     contigs_meta = meta[_ARCHIVE_META_KEY]
@@ -421,8 +421,8 @@ def from_ts(ts, record_provenance=True):
         if record_provenance:
             provenance_record = {
                 "software": {
-                    "name": "tskit_multichrom",
-                    "version": tskit_multichrom_version,
+                    "name": "tsgroup",
+                    "version": tsgroup_version,
                 },
                 "parameters": {
                     "command": "from_ts",
@@ -434,15 +434,15 @@ def from_ts(ts, record_provenance=True):
 
         result[key] = contig_tc.tree_sequence()
 
-    return TreeSequenceDictionary(result)
+    return TreeSequenceGroup(result)
 
 
 def from_slim(tree_sequences, *, slim_metadata_key="SLiM"):
     """
-    Convert SLiM-style tree sequences into a :class:`TreeSequenceDictionary`.
+    Convert SLiM-style tree sequences into a :class:`TreeSequenceGroup`.
 
     In SLiM tree sequences all nodes are shared across chromosomes, so
-    :data:`~tskit_multichrom.flags.NODE_IS_SHARED` is set on every node.
+    :data:`~tsgroup.flags.NODE_IS_SHARED` is set on every node.
     The contig information is read from the SLiM top-level metadata
     ``['SLiM']['this_chromosome']`` and duplicated into the ``'contig'`` key.
 
@@ -455,7 +455,7 @@ def from_slim(tree_sequences, *, slim_metadata_key="SLiM"):
 
     Returns
     -------
-    TreeSequenceDictionary
+    TreeSequenceGroup
     """
     result = {}
     for ts in tree_sequences:
@@ -515,7 +515,7 @@ def from_slim(tree_sequences, *, slim_metadata_key="SLiM"):
         tables.metadata = new_meta
         result[key] = tables.tree_sequence()
 
-    return TreeSequenceDictionary(result)
+    return TreeSequenceGroup(result)
 
 
 def from_tree_sequences(
@@ -527,9 +527,9 @@ def from_tree_sequences(
     shared_nodes=None,
 ):
     """
-    Create a :class:`TreeSequenceDictionary` from a list of tree sequences without contig metadata.
+    Create a :class:`TreeSequenceGroup` from a list of tree sequences without contig metadata.
 
-    This function combines multiple independent tree sequences into a TreeSequenceDictionary,
+    This function combines multiple independent tree sequences into a TreeSequenceGroup,
     automatically annotating them with contig metadata and optionally marking shared nodes.
 
     Parameters
@@ -548,7 +548,7 @@ def from_tree_sequences(
         Contig indexes (ordering integers, one per tree sequence). If None,
         defaults to ``[0, 1, 2, ...]``.
     shared_nodes : str or list[int], optional
-        Which nodes to mark with :data:`~tskit_multichrom.flags.NODE_IS_SHARED`:
+        Which nodes to mark with :data:`~tsgroup.flags.NODE_IS_SHARED`:
 
         - ``None`` (default): Do not mark any nodes as IS_SHARED.
         - ``"samples"``: Mark all sample nodes as IS_SHARED.
@@ -556,8 +556,8 @@ def from_tree_sequences(
 
     Returns
     -------
-    TreeSequenceDictionary
-        A new TreeSequenceDictionary with contigs in index order.
+    TreeSequenceGroup
+        A new TreeSequenceGroup with contigs in index order.
 
     Raises
     ------
@@ -623,7 +623,7 @@ def from_tree_sequences(
                 "shared_nodes must be None, 'samples', or a list of node IDs"
             ) from e
 
-    # Build TreeSequenceDictionary dict
+    # Build TreeSequenceGroup dict
     result = {}
     for i, (ts, idx, contig_id, symbol, typ) in enumerate(
         zip(tree_sequences, indexes, ids, symbols, types)
@@ -685,7 +685,7 @@ def from_tree_sequences(
         ts_final = tables.tree_sequence()
         result[key] = ts_final
 
-    return TreeSequenceDictionary(result)
+    return TreeSequenceGroup(result)
 
 
 def _get_shared_for_contig(ts, is_shared_global, contig_index):

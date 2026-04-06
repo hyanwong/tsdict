@@ -1,61 +1,61 @@
 """
-Tests for the TreeSequenceDictionary core class.
+Tests for the TreeSequenceGroup core class.
 """
 
 import pytest
 import tskit
 
-import tskit_multichrom as tmc
+import tsgroup
 from tests.conftest import make_ts, make_two_contig_archive, make_autosomes_plus_x_archive
 
 
 class TestContigKey:
     def test_basic(self):
-        key = tmc.ContigKey(0, 0, "chr1", "A")
+        key = tsgroup.ContigKey(0, 0, "chr1", "A")
         assert key.index == 0
         assert key.id == 0
         assert key.symbol == "chr1"
         assert key.type == "A"
 
     def test_namedtuple(self):
-        key = tmc.ContigKey(0, 0, "chr1", "A")
+        key = tsgroup.ContigKey(0, 0, "chr1", "A")
         assert key[0] == 0
         assert key[1] == 0
         assert key[2] == "chr1"
         assert key[3] == "A"
 
 
-class TestTreeSequenceDictionaryConstruction:
+class TestTreeSequenceGroupConstruction:
     def test_basic(self):
         tsd = make_two_contig_archive()
         assert tsd.num_contigs == 2
 
     def test_empty(self):
-        tsd = tmc.TreeSequenceDictionary({})
+        tsd = tsgroup.TreeSequenceGroup({})
         assert tsd.num_contigs == 0
 
     def test_wrong_key_type(self):
         ts = make_ts(contig_meta={"index": 0, "id": 0, "symbol": "c1", "type": "A"})
         with pytest.raises(TypeError, match="ContigKey"):
-            tmc.TreeSequenceDictionary({"bad_key": ts})
+            tsgroup.TreeSequenceGroup({"bad_key": ts})
 
     def test_wrong_value_type(self):
         with pytest.raises(TypeError, match="tskit.TreeSequence"):
-            tmc.TreeSequenceDictionary({tmc.ContigKey(0, 0, "c1", "A"): "not a ts"})
+            tsgroup.TreeSequenceGroup({tsgroup.ContigKey(0, 0, "c1", "A"): "not a ts"})
 
     def test_non_dict(self):
         with pytest.raises(TypeError, match="dict"):
-            tmc.TreeSequenceDictionary([])
+            tsgroup.TreeSequenceGroup([])
 
 
 class TestValidation:
     def test_static_validate_accepts_mapping(self):
         ts1 = make_ts(contig_meta={"index": 0, "id": 0, "symbol": "c1", "type": "A"})
         ts2 = make_ts(contig_meta={"index": 1, "id": 1, "symbol": "c2", "type": "A"})
-        tmc.TreeSequenceDictionary.validate(
+        tsgroup.TreeSequenceGroup.validate(
             {
-                tmc.ContigKey(0, 0, "c1", "A"): ts1,
-                tmc.ContigKey(1, 1, "c2", "A"): ts2,
+                tsgroup.ContigKey(0, 0, "c1", "A"): ts1,
+                tsgroup.ContigKey(1, 1, "c2", "A"): ts2,
             }
         )
 
@@ -63,10 +63,10 @@ class TestValidation:
         ts1 = make_ts(contig_meta={"index": 0, "id": 0, "symbol": "c1", "type": "A"})
         ts2 = make_ts(contig_meta={"index": 0, "id": 1, "symbol": "c2", "type": "A"})
         with pytest.raises(ValueError, match="index"):
-            tmc.TreeSequenceDictionary(
+            tsgroup.TreeSequenceGroup(
                 {
-                    tmc.ContigKey(0, 0, "c1", "A"): ts1,
-                    tmc.ContigKey(0, 1, "c2", "A"): ts2,
+                    tsgroup.ContigKey(0, 0, "c1", "A"): ts1,
+                    tsgroup.ContigKey(0, 1, "c2", "A"): ts2,
                 }
             )
 
@@ -74,10 +74,10 @@ class TestValidation:
         ts1 = make_ts(contig_meta={"index": 0, "id": 0, "symbol": "c1", "type": "A"})
         ts2 = make_ts(contig_meta={"index": 1, "id": 0, "symbol": "c2", "type": "A"})
         with pytest.raises(ValueError, match="id"):
-            tmc.TreeSequenceDictionary(
+            tsgroup.TreeSequenceGroup(
                 {
-                    tmc.ContigKey(0, 0, "c1", "A"): ts1,
-                    tmc.ContigKey(1, 0, "c2", "A"): ts2,
+                    tsgroup.ContigKey(0, 0, "c1", "A"): ts1,
+                    tsgroup.ContigKey(1, 0, "c2", "A"): ts2,
                 }
             )
 
@@ -85,17 +85,17 @@ class TestValidation:
         ts1 = make_ts(contig_meta={"index": 0, "id": 0, "symbol": "c1", "type": "A"})
         ts2 = make_ts(contig_meta={"index": 1, "id": 1, "symbol": "c1", "type": "A"})
         with pytest.raises(ValueError, match="symbol"):
-            tmc.TreeSequenceDictionary(
+            tsgroup.TreeSequenceGroup(
                 {
-                    tmc.ContigKey(0, 0, "c1", "A"): ts1,
-                    tmc.ContigKey(1, 1, "c1", "A"): ts2,
+                    tsgroup.ContigKey(0, 0, "c1", "A"): ts1,
+                    tsgroup.ContigKey(1, 1, "c1", "A"): ts2,
                 }
             )
 
     def test_missing_contig_metadata(self):
         ts_no_meta = make_ts(contig_meta=None)  # no metadata at all
         with pytest.raises(ValueError, match="contig"):
-            tmc.TreeSequenceDictionary({tmc.ContigKey(0, 0, "c1", "A"): ts_no_meta})
+            tsgroup.TreeSequenceGroup({tsgroup.ContigKey(0, 0, "c1", "A"): ts_no_meta})
 
     def test_individual_tables_mismatch(self):
         ts1 = make_ts(
@@ -107,10 +107,10 @@ class TestValidation:
             contig_meta={"index": 1, "id": 1, "symbol": "c2", "type": "A"},
         )
         with pytest.raises(ValueError, match="Individual"):
-            tmc.TreeSequenceDictionary(
+            tsgroup.TreeSequenceGroup(
                 {
-                    tmc.ContigKey(0, 0, "c1", "A"): ts1,
-                    tmc.ContigKey(1, 1, "c2", "A"): ts2,
+                    tsgroup.ContigKey(0, 0, "c1", "A"): ts1,
+                    tsgroup.ContigKey(1, 1, "c2", "A"): ts2,
                 }
             )
 
@@ -124,10 +124,10 @@ class TestValidation:
         tables.metadata = {"contig": {"index": 1, "id": 1, "symbol": "c2", "type": "A"}}
         ts2 = tables.tree_sequence()
         with pytest.raises(ValueError, match="Population"):
-            tmc.TreeSequenceDictionary(
+            tsgroup.TreeSequenceGroup(
                 {
-                    tmc.ContigKey(0, 0, "c1", "A"): ts1,
-                    tmc.ContigKey(1, 1, "c2", "A"): ts2,
+                    tsgroup.ContigKey(0, 0, "c1", "A"): ts1,
+                    tsgroup.ContigKey(1, 1, "c2", "A"): ts2,
                 }
             )
 
@@ -141,7 +141,7 @@ class TestValidation:
         )
         ts_with_mig = tables.tree_sequence()
         with pytest.raises(ValueError, match="[Mm]igration"):
-            tmc.TreeSequenceDictionary({tmc.ContigKey(0, 0, "c1", "A"): ts_with_mig})
+            tsgroup.TreeSequenceGroup({tsgroup.ContigKey(0, 0, "c1", "A"): ts_with_mig})
 
 
 class TestCaching:
@@ -203,7 +203,7 @@ class TestAccess:
 
     def test_getitem(self):
         tsd = make_two_contig_archive()
-        key = tmc.ContigKey(0, 0, "chr1", "A")
+        key = tsgroup.ContigKey(0, 0, "chr1", "A")
         assert tsd[key].sequence_length == 1000
 
     def test_len(self):
@@ -258,10 +258,10 @@ class TestSubset:
             seq_len=500,
             contig_meta={"index": 1, "id": 1, "symbol": "chrX", "type": "X"},
         )
-        tsd = tmc.TreeSequenceDictionary(
+        tsd = tsgroup.TreeSequenceGroup(
             {
-                tmc.ContigKey(0, 0, "chr1", "A"): ts1,
-                tmc.ContigKey(1, 1, "chrX", "X"): ts2,
+                tsgroup.ContigKey(0, 0, "chr1", "A"): ts1,
+                tsgroup.ContigKey(1, 1, "chrX", "X"): ts2,
             }
         )
         sub = tsd.subset(types=["A"])
@@ -278,10 +278,10 @@ class TestSubset:
             seq_len=500,
             contig_meta={"index": 1, "id": 1, "symbol": "chrX", "type": "X"},
         )
-        tsd = tmc.TreeSequenceDictionary(
+        tsd = tsgroup.TreeSequenceGroup(
             {
-                tmc.ContigKey(0, 0, "chr1", "A"): ts1,
-                tmc.ContigKey(1, 1, "chrX", "X"): ts2,
+                tsgroup.ContigKey(0, 0, "chr1", "A"): ts1,
+                tsgroup.ContigKey(1, 1, "chrX", "X"): ts2,
             }
         )
         sub = tsd.subset(type="A")
@@ -346,7 +346,7 @@ class TestSimplify:
         # All sample nodes should still have IS_SHARED set after simplify
         ts = tsd2.contig("chr1")
         for s in ts.samples():
-            assert ts.node(s).flags & tmc.NODE_IS_SHARED
+            assert ts.node(s).flags & tsgroup.NODE_IS_SHARED
 
     def test_simplify_consistent_sample_ids_across_contigs(self):
         tsd = make_two_contig_archive(mark_shared=True, num_samples=4)
@@ -362,7 +362,7 @@ class TestSimplify:
             tsd.simplify()
 
     def test_simplify_empty_assemblage(self):
-        tsd = tmc.TreeSequenceDictionary({})
+        tsd = tsgroup.TreeSequenceGroup({})
         tsd2 = tsd.simplify()
         assert tsd2.num_contigs == 0
 

@@ -1,10 +1,10 @@
 """
-Test fixtures and helpers for tsdict tests.
+Test fixtures and helpers for tsgroup tests.
 """
 
 import numpy as np
 import tskit
-import tskit_multichrom as tmc
+import tsgroup
 
 
 CONTIG_SCHEMA = {
@@ -63,7 +63,7 @@ def make_ts(
 
     node_flags = tskit.NODE_IS_SAMPLE
     if mark_shared:
-        node_flags |= tmc.NODE_IS_SHARED
+        node_flags |= tsgroup.NODE_IS_SHARED
 
     for ind_id in range(num_individuals):
         tables.nodes.add_row(
@@ -82,7 +82,7 @@ def make_ts(
         )
 
     # One ancestral node (not a sample, but shared too)
-    anc_flags = tmc.NODE_IS_SHARED if mark_shared else 0
+    anc_flags = tsgroup.NODE_IS_SHARED if mark_shared else 0
     tables.nodes.add_row(
         flags=anc_flags,
         time=1.0,
@@ -104,7 +104,7 @@ def make_ts(
 
 
 def make_two_contig_archive(mark_shared=True, num_samples=4):
-    """Return a TreeSequenceDictionary with two autosomes."""
+    """Return a TreeSequenceGroup with two autosomes."""
     ts1 = make_ts(
         seq_len=1000,
         num_samples=num_samples,
@@ -117,17 +117,17 @@ def make_two_contig_archive(mark_shared=True, num_samples=4):
         contig_meta={"index": 1, "id": 1, "symbol": "chr2", "type": "A"},
         mark_shared=mark_shared,
     )
-    return tmc.TreeSequenceDictionary(
+    return tsgroup.TreeSequenceGroup(
         {
-            tmc.ContigKey(0, 0, "chr1", "A"): ts1,
-            tmc.ContigKey(1, 1, "chr2", "A"): ts2,
+            tsgroup.ContigKey(0, 0, "chr1", "A"): ts1,
+            tsgroup.ContigKey(1, 1, "chr2", "A"): ts2,
         }
     )
 
 
 def make_autosomes_plus_x_archive(num_samples=4):
     """
-    Return an A/A/X TreeSequenceDictionary where chrX has fewer sample nodes.
+    Return an A/A/X TreeSequenceGroup where chrX has fewer sample nodes.
 
     chr1/chr2 have shared sample nodes 0..num_samples-1.
     chrX keeps only the first half as samples/shared; the rest are nonsample,
@@ -155,15 +155,15 @@ def make_autosomes_plus_x_archive(num_samples=4):
 
     result = {}
     for key, ts, mark_samples_shared in [
-        (tmc.ContigKey(0, 0, "chr1", "A"), ts1, True),
-        (tmc.ContigKey(1, 1, "chr2", "A"), ts2, True),
-        (tmc.ContigKey(2, 2, "chrX", "X"), tsx, False),
+        (tsgroup.ContigKey(0, 0, "chr1", "A"), ts1, True),
+        (tsgroup.ContigKey(1, 1, "chr2", "A"), ts2, True),
+        (tsgroup.ContigKey(2, 2, "chrX", "X"), tsx, False),
     ]:
         tables = ts.dump_tables()
         if mark_samples_shared:
             flags = tables.nodes.flags.copy()
             sample_ids = ts.samples()
-            flags[sample_ids] = flags[sample_ids] | tmc.NODE_IS_SHARED
+            flags[sample_ids] = flags[sample_ids] | tsgroup.NODE_IS_SHARED
             tables.nodes.flags = flags
         else:
             # chrX: keep only first half of samples as sample/shared
@@ -174,12 +174,12 @@ def make_autosomes_plus_x_archive(num_samples=4):
             drop_sample_ids = sample_ids[keep_n:]
 
             # Keep sample status on first half and mark them shared.
-            flags[keep_sample_ids] = flags[keep_sample_ids] | tmc.NODE_IS_SHARED
+            flags[keep_sample_ids] = flags[keep_sample_ids] | tsgroup.NODE_IS_SHARED
 
             # Remove sample + shared flags from second half.
-            clear_bits = np.uint32(tskit.NODE_IS_SAMPLE | tmc.NODE_IS_SHARED)
+            clear_bits = np.uint32(tskit.NODE_IS_SAMPLE | tsgroup.NODE_IS_SHARED)
             flags[drop_sample_ids] = flags[drop_sample_ids] & (~clear_bits)
             tables.nodes.flags = flags
         result[key] = tables.tree_sequence()
 
-    return tmc.TreeSequenceDictionary(result)
+    return tsgroup.TreeSequenceGroup(result)

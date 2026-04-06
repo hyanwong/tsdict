@@ -1,5 +1,5 @@
 """
-Tests for TreeSequenceDictionary I/O (load/dump).
+Tests for TreeSequenceGroup I/O (load/dump).
 """
 
 import os
@@ -9,7 +9,7 @@ import zipfile
 import pytest
 import tskit
 
-import tskit_multichrom as tmc
+import tsgroup
 from tests.conftest import make_two_contig_archive
 
 
@@ -22,7 +22,7 @@ class TestDumpLoadZip:
             path = f.name
         try:
             tsd.dump(path)
-            tsd2 = tmc.load(path)
+            tsd2 = tsgroup.load(path)
             assert tsd2.num_contigs == 2
             assert tsd2.total_sequence_length == tsd.total_sequence_length
         finally:
@@ -34,7 +34,7 @@ class TestDumpLoadZip:
             path = f.name
         try:
             tsd.dump(path)
-            tsd2 = tmc.load(path)
+            tsd2 = tsgroup.load(path)
             assert tsd2.contig("chr1").sequence_length == 1000
             assert tsd2.contig("chr2").sequence_length == 2000
         finally:
@@ -75,7 +75,7 @@ class TestDumpLoadZip:
             path = f.name
         try:
             with pytest.raises(ValueError, match="valid trees archive"):
-                tmc.load(path)
+                tsgroup.load(path)
         finally:
             os.unlink(path)
 
@@ -86,7 +86,7 @@ class TestDumpLoadZip:
             with zipfile.ZipFile(path, "w"):
                 pass
             with pytest.raises(ValueError, match="No .trees or .tsz files"):
-                tmc.load(path)
+                tsgroup.load(path)
         finally:
             os.unlink(path)
 
@@ -96,11 +96,11 @@ class TestDumpLoadZip:
             path = f.name
         try:
             tsd.dump(path)
-            tsd2 = tmc.load(path)
+            tsd2 = tsgroup.load(path)
             ts = tsd2.contig("chr1")
             for node_id in range(ts.num_nodes):
                 flags = ts.tables.nodes[node_id].flags
-                assert flags & tmc.NODE_IS_SHARED, (
+                assert flags & tsgroup.NODE_IS_SHARED, (
                     f"Node {node_id} should have IS_SHARED set, got flags={flags}"
                 )
         finally:
@@ -115,7 +115,7 @@ class TestDumpLoadDir:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = os.path.join(tmpdir, "genome_trees")
             tsd.dump(path)
-            tsd2 = tmc.load(path)
+            tsd2 = tsgroup.load(path)
             assert tsd2.num_contigs == 2
             assert tsd2.total_sequence_length == tsd.total_sequence_length
 
@@ -124,7 +124,7 @@ class TestDumpLoadDir:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = os.path.join(tmpdir, "genome_trees")
             tsd.dump(path)
-            tsd2 = tmc.load(path)
+            tsd2 = tsgroup.load(path)
             assert tsd2.contig("chr1").sequence_length == 1000
             assert tsd2.contig("chr2").sequence_length == 2000
 
@@ -140,11 +140,11 @@ class TestDumpLoadDir:
     def test_load_empty_dir_raises(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             with pytest.raises(ValueError, match="No .trees"):
-                tmc.load(tmpdir)
+                tsgroup.load(tmpdir)
 
 
 class TestDumpMethod:
-    """Tests for TreeSequenceDictionary.dump() instance method."""
+    """Tests for TreeSequenceGroup.dump() instance method."""
 
     def test_dump_method_zip(self):
         tsd = make_two_contig_archive()
@@ -152,7 +152,7 @@ class TestDumpMethod:
             path = f.name
         try:
             tsd.dump(path)
-            tsd2 = tmc.load(path)
+            tsd2 = tsgroup.load(path)
             assert tsd2.num_contigs == 2
             assert tsd2.total_sequence_length == tsd.total_sequence_length
         finally:
@@ -163,5 +163,5 @@ class TestDumpMethod:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = os.path.join(tmpdir, "genome_trees")
             tsd.dump(path)
-            tsd2 = tmc.load(path)
+            tsd2 = tsgroup.load(path)
             assert tsd2.num_contigs == 2

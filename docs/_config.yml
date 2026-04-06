@@ -1,6 +1,6 @@
 # Learn more at https://jupyterbook.org/customize/config.html
 
-title: tskit_multichrom
+title: tsgroup
 author: Yan Wong
 copyright: "2026"
 only_build_toc_files: true
@@ -9,7 +9,7 @@ execute:
   execute_notebooks: "off"
 
 repository:
-  url: https://github.com/hyanwong/tsdict
+  url: https://github.com/hyanwong/tsgroup
   branch: main
   path_to_book: docs
 
@@ -34,12 +34,12 @@ sphinx:
       pygments_dark_style: monokai
       navigation_with_keys: false
       logo:
-        text: "tskit_multichrom"
+        text: "tsgroup"
     pygments_style: monokai
     myst_enable_extensions:
       - colon_fence
       - deflist
-    issues_github_path: hyanwong/tsdict
+    issues_github_path: hyanwong/tsgroup
     autodoc_member_order: bysource
     # Avoid broken links from unresolved type hints
     autodoc_typehints: none

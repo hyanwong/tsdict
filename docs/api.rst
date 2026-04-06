@@ -4,7 +4,7 @@
 API Documentation
 =================
 
-.. currentmodule:: tskit_multichrom
+.. currentmodule:: tsgroup
 
 
 .. _sec_api_toplevel:
@@ -25,10 +25,10 @@ Top-level functions
 .. _sec_api_tsd:
 
 ****************************
-TreeSequenceDictionary
+TreeSequenceGroup
 ****************************
 
-.. autoclass:: TreeSequenceDictionary
+.. autoclass:: TreeSequenceGroup
     :members: validate, contig, subset, reindex, simplify, dump, to_ts,
               keys, values, items,
               contigs, num_contigs, total_sequence_length,
@@ -44,9 +44,9 @@ Statistics
 ****************************
 
 The statistics sub-namespace is accessed via
-:attr:`TreeSequenceDictionary.stats`:
+:attr:`TreeSequenceGroup.stats`:
 
-.. autoclass:: tskit_multichrom.stats.TreeSequenceDictionaryStats
+.. autoclass:: tsgroup.stats.TreeSequenceGroupStats
     :members: diversity, pca
 
 
