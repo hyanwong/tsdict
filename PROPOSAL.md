@@ -26,7 +26,7 @@ Key points:
 4. We require time_units to be identical within an archive
 5. Node tables are not required to be identical (although they can be, as in SLiM), but are required to have the same metadata schema (so shared nodes can be identical, see 7 below)
 6. Provenance tables are not required to be identical within an archive
-7. Some nodes are shared between multiple tree sequences. We set flag IS_SHARED on nodes to specify whether this node ID is shared across all the tree sequences in this assemblage (i.e. node tables can be partially shared)
+7. Some nodes are shared between multiple tree sequences. We set flag IS_SHARED on nodes to specify whether this node ID is shared across all the tree sequences in this group (i.e. node tables can be partially shared)
     * If one node has this flag set, each node in the archive which has both the same ID and the IS_SHARED flag set must be identical (i.e. have identical flags, times, individuals, populations, and metadata)
     * Nodes without the IS_SHARED flag are treated as specific to that local tree sequence (this includes nodes with the same ID as another IS_SHARED node on a different contig). This provides an alternative approach to the `is_vacant` bitfield flag in the SLiM representation.
 8. The top level metadata of each tree sequence must contain a 'contig' key in the same format as used by the `this_chromosome` field in SLiM, that specifies "index", "id", "symbol", and "type". "Id" and "index" are required to be non-negative integers, and unique across contigs. The order of contigs in the archive is determined by the order of the "index" values, but there is a looser specification for "index" in that the integers are not required to be consecutive (see "reindexing" below).
@@ -41,7 +41,7 @@ The following are optional but highly recommended (reasons explained below)
 
 ### Constraints
 
-The tskit node ID is used to link all nodes that are shared. This has the major advantage that a single ID is valid both for each constituent tree sequence and for the total assemblage. The down side to this is that, as node IDs correspond to their order in the node tables, having a shared node ID of (say) 99 requires tree sequences sharing that node to have at least 100 nodes in total. We can minimise this problem by using low IDs for "shared nodes" (likely to be generally true, as shared nodes are most often samples, and samples often have IDs 0..N). If necessary we can also pad the node table with unused nodes. 
+The tskit node ID is used to link all nodes that are shared. This has the major advantage that a single ID is valid both for each constituent tree sequence and for the group as a whole. The down side to this is that, as node IDs correspond to their order in the node tables, having a shared node ID of (say) 99 requires tree sequences sharing that node to have at least 100 nodes in total. We can minimise this problem by using low IDs for "shared nodes" (likely to be generally true, as shared nodes are most often samples, and samples often have IDs 0..N). If necessary we can also pad the node table with unused nodes. 
 
 ## Basic functions
 
@@ -133,7 +133,7 @@ We enumerate through the top-level array getting `i` and the `num_nodes` for eac
 
 * `samples=[...]`: provided node IDs must be globally phased.
 * `individuals=[...]`: simplifies each contig using sample nodes for those individuals; this works on nonglobal-sample ARGs where nonglobal sample nodes are present.
-* With neither argument, simplification defaults to global phased samples and is allowed only when the assemblage is not a nonglobal-sample ARG.
+* With neither argument, simplification defaults to global phased samples and fails when the group represents a nonglobal-sample ARG.
 * ❌ other arguments to simplify not yet implemented (details to work out: some
 arguments may not be appropriate)
 
@@ -177,7 +177,7 @@ arguments may not be appropriate)
 - ✅ tsg.to_ts() — merge TreeSequenceGroup into single TreeSequence
 - ✅ from_ts() — split single TreeSequence into TreeSequenceGroup
 - ✅ from_slim() — convert SLiM-style tree sequences to TreeSequenceGroup
-- ✅ from_tree_sequences() — create assemblage from list of tree sequences
+- ✅ from_tree_sequences() — create a TreeSequenceGroup from list of tree sequences
 
 ### Statistics (⚠️ Partial)
 - ✅ Cross-contig stats with `sample_sets` parameter (requires globally phased nodes) — `diversity()` implemented

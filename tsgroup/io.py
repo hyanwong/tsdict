@@ -141,7 +141,7 @@ def load(path):
     return TreeSequenceGroup(tree_sequences)
 
 
-def dump(assemblage, path, *, compress=False):
+def dump(tsg, path, *, compress=False):
     """
     Save a :class:`~tsgroup.TreeSequenceGroup` to a trees archive.
 
@@ -157,7 +157,7 @@ def dump(assemblage, path, *, compress=False):
 
     Parameters
     ----------
-    assemblage : TreeSequenceGroup
+    tsg : TreeSequenceGroup
     path : str or path-like
         Destination path (directory or zip file).
     compress : bool
@@ -169,16 +169,16 @@ def dump(assemblage, path, *, compress=False):
     is_zip = path_lower.endswith(".zip") or path_lower.endswith("_trees.zip")
 
     if is_zip:
-        _dump_zip(assemblage, path, compress=compress)
+        _dump_zip(tsg, path, compress=compress)
     else:
-        _dump_dir(assemblage, path, compress=compress)
+        _dump_dir(tsg, path, compress=compress)
 
 
-def _dump_dir(assemblage, path, *, compress=False):
+def _dump_dir(tsg, path, *, compress=False):
     """Write a trees archive to a directory."""
     os.makedirs(path, exist_ok=True)
-    for key in assemblage.contigs:
-        ts = assemblage[key]
+    for key in tsg.contigs:
+        ts = tsg[key]
         if compress:
             dest = os.path.join(path, f"{key.symbol}.tsz")
             tszip.compress(ts, dest)
@@ -187,12 +187,12 @@ def _dump_dir(assemblage, path, *, compress=False):
             ts.dump(dest)
 
 
-def _dump_zip(assemblage, path, *, compress=False):
+def _dump_zip(tsg, path, *, compress=False):
     """Write a trees archive to an uncompressed zip file."""
     with tempfile.TemporaryDirectory() as tmpdir:
         with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_STORED) as zf:
-            for key in assemblage.contigs:
-                ts = assemblage[key]
+            for key in tsg.contigs:
+                ts = tsg[key]
                 if compress:
                     tmp_path = os.path.join(tmpdir, f"{key.symbol}.tsz")
                     tszip.compress(ts, tmp_path)

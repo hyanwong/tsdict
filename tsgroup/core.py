@@ -10,7 +10,7 @@ import tskit
 from .flags import CONTIG_METADATA_KEY, NODE_IS_SHARED
 from .stats import TreeSequenceGroupStats
 
-# Named tuple representing a contig's key in the assemblage dictionary.
+# Named tuple representing a contig's key in the dictionary.
 # - index: ordering integer (not required to be consecutive)
 # - id: unique integer identifier
 # - symbol: string identifier (e.g. "chrX")
@@ -20,7 +20,7 @@ ContigKey = collections.namedtuple("ContigKey", ["index", "id", "symbol", "type"
 
 class TreeSequenceGroup:
     """
-    A dictionary-like collection of tree sequences representing multiple contigs
+    A grouping of linked tree sequences with a dictionary-like interface representing multiple contigs
     (chromosomes), with additional methods that allow manipulation or analysis of
     all contigs simultaneously.
 
@@ -28,8 +28,8 @@ class TreeSequenceGroup:
     convenience they can also be accessed by id or symbol using the
     :meth:`contig` method.
 
-    The assemblage enforces a set of consistency requirements across the
-    constituent tree sequences (see :meth:`validate`).
+    Grouping contigs in this way enforces a set of consistency requirements across
+    the constituent tree sequences (see :meth:`validate`).
 
     Parameters
     ----------
@@ -105,12 +105,12 @@ class TreeSequenceGroup:
         symbols = [k.symbol for k in keys]
 
         if len(set(indexes)) != len(indexes):
-            raise ValueError("Contig 'index' values must be unique within an assemblage")
+            raise ValueError("Contig 'index' values must be unique within a group")
         if len(set(ids)) != len(ids):
-            raise ValueError("Contig 'id' values must be unique within an assemblage")
+            raise ValueError("Contig 'id' values must be unique within a group")
         if len(set(symbols)) != len(symbols):
             raise ValueError(
-                "Contig 'symbol' values must be unique within an assemblage"
+                "Contig 'symbol' values must be unique within a group"
             )
         for k in keys:
             if not isinstance(k.index, int) or k.index < 0:
@@ -133,16 +133,14 @@ class TreeSequenceGroup:
         for ts in tss[1:]:
             if not ref_ts.tables.individuals.equals(ts.tables.individuals):
                 raise ValueError(
-                    "Individual tables must be identical across all contigs in an "
-                    "assemblage"
+                    "Individual tables must be identical across all contigs in a group"
                 )
 
         # Population tables must be identical
         for ts in tss[1:]:
             if not ref_ts.tables.populations.equals(ts.tables.populations):
                 raise ValueError(
-                    "Population tables must be identical across all contigs in an "
-                    "assemblage"
+                    "Population tables must be identical across all contigs in a group"
                 )
 
         # Migration tables must be empty
@@ -158,7 +156,7 @@ class TreeSequenceGroup:
         for ts in tss[1:]:
             if ts.time_units != ref_time_units:
                 raise ValueError(
-                    "time_units must be identical across all contigs in an assemblage"
+                    "time_units must be identical across all contigs in a group"
                 )
 
         # Node metadata schemas must be identical
@@ -245,7 +243,7 @@ class TreeSequenceGroup:
     # ------------------------------------------------------------------
 
     def _build_cache(self):
-        """Build the internal cache for the assemblage."""
+        """Build the internal cache for the group."""
         self._cache = {}
 
         self._cache["total_sequence_length"] = sum(
@@ -315,7 +313,7 @@ class TreeSequenceGroup:
 
     @property
     def contigs(self):
-        """list[ContigKey]: Contig keys sorted by index. Equivalent to list(tsd.keys())."""
+        """list[ContigKey]: Contig keys sorted by index. Equivalent to list(tsg.keys())."""
         return list(self.keys())
 
     @property
@@ -345,7 +343,7 @@ class TreeSequenceGroup:
 
     @property
     def num_contigs(self):
-        """int: Number of contigs in the assemblage."""
+        """int: Number of contigs in the group."""
         return len(self._tree_sequences)
 
     @property
@@ -550,7 +548,7 @@ class TreeSequenceGroup:
 
     def dump(self, path, *, compress=False):
         """
-        Save this assemblage to a trees archive.
+        Save this group to a trees archive.
 
         This is a convenience wrapper around :func:`tsgroup.io.dump`.
         See that function for full documentation.
@@ -568,7 +566,7 @@ class TreeSequenceGroup:
 
     def to_ts(self, record_provenance=True):
         """
-        Merge this assemblage into a single :class:`tskit.TreeSequence`.
+        Smush this group into a single :class:`tskit.TreeSequence`.
 
         This is a convenience wrapper around :func:`tsgroup.convert.to_ts`.
         See that function for full documentation.
@@ -590,7 +588,7 @@ class TreeSequenceGroup:
         """
         Return a new simplified :class:`TreeSequenceGroup`.
 
-        All tree sequences in the assemblage are simplified simultaneously,
+        All tree sequences in the group are simplified simultaneously,
         maintaining consistent node IDs for shared nodes across contigs.
 
         Parameters
@@ -617,7 +615,7 @@ class TreeSequenceGroup:
         ------
         ValueError
             If both ``samples`` and ``individuals`` are provided.
-            If neither is provided and the assemblage has nonglobally
+            If neither is provided and the group has nonglobally
             phased sample nodes (:attr:`is_nonglobal_sample_arg` is ``True``).
         """
         if samples is not None and individuals is not None:
@@ -631,10 +629,10 @@ class TreeSequenceGroup:
         if individuals is None and samples is None:
             if self.is_nonglobal_sample_arg:
                 raise ValueError(
-                    "Cannot simplify an assemblage with nonglobal sample nodes "
+                    "Cannot simplify a group with nonglobal sample nodes "
                     "without specifying 'samples' or 'individuals'. Provide "
                     "individuals=[...] to select which individuals to retain, or "
-                    "call tsd.subset() first to restrict to fully cross-phased contigs."
+                    "call tsg.subset() first to restrict to fully cross-phased contigs."
                 )
             # Consistent ordering across all contigs: sort globally phased node IDs.
             # As there are no nonglobally phased sample nodes, every sample in

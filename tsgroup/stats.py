@@ -53,7 +53,7 @@ class TreeSequenceGroupStats:
 
         For ``windows=None``, this computes per-contig diversity and combines
         values by contig span so that results match running ``diversity`` on
-        ``to_ts(tsd)`` for the same arguments.
+        ``to_ts(tsg)`` for the same arguments.
 
         Notes
         -----
@@ -62,7 +62,7 @@ class TreeSequenceGroupStats:
         """
         if windows is not None:
             raise NotImplementedError(
-                "tsd.stats.diversity does not yet support windows"
+                "tsg.stats.diversity does not yet support windows"
             )
 
         if self._tsg.num_contigs == 0:
@@ -120,7 +120,7 @@ class TreeSequenceGroupStats:
         """
         Perform PCA across all contigs.
 
-        Internally calls ``tsd.to_ts()`` to obtain a single combined tree
+        Internally calls ``tsg.to_ts()`` to obtain a single combined tree
         sequence and then delegates to :meth:`tskit.TreeSequence.pca`.
 
         When ``samples`` is provided (or defaulted) every sample node ID must
@@ -135,7 +135,7 @@ class TreeSequenceGroupStats:
             Number of principal components to return.
         windows : list, optional
             Genomic windows; coordinates refer to the combined tree sequence
-            returned by ``tsd.to_ts()``.
+            returned by ``tsg.to_ts()``.
         samples : array_like, optional
             Sample node IDs. Must be globally phased. Mutually exclusive with
             ``individuals``.

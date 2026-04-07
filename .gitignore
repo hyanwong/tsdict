@@ -10,6 +10,9 @@ dist/
 build/
 .eggs/
 
+# Mac OS
+.DS_Store
+
 # Virtual environments
 .venv/
 env/

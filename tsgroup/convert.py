@@ -4,7 +4,7 @@ Conversion functions between a :class:`TreeSequenceGroup` and a single
 
 Overview
 --------
-**tsd.to_ts** merges all contigs in a :class:`TreeSequenceGroup` into a single
+**tsg.to_ts** merges all contigs in a :class:`TreeSequenceGroup` into a single
 :class:`tskit.TreeSequence` by concatenating their genomic coordinate systems,
 placing contigs end-to-end. Shared nodes (IS_SHARED flag) retain their IDs;
 non-shared nodes get new IDs.
@@ -33,9 +33,9 @@ from .flags import CONTIG_METADATA_KEY, NODE_IS_SHARED
 _ARCHIVE_META_KEY = "contigs"
 
 
-def to_ts(tsd, record_provenance=True):
+def to_ts(tsg, record_provenance=True):
     """
-    Merge a :class:`TreeSequenceGroup` into a single :class:`tskit.TreeSequence`.
+    Smush a :class:`TreeSequenceGroup` into a single :class:`tskit.TreeSequence`.
 
     Contigs are placed end-to-end in order of their ``index`` values.
     Shared nodes (those with :data:`~tsgroup.flags.NODE_IS_SHARED` set)
@@ -47,7 +47,7 @@ def to_ts(tsd, record_provenance=True):
 
     Parameters
     ----------
-    tsd : TreeSequenceGroup
+    tsg : TreeSequenceGroup
     record_provenance : bool
         Whether to append a provenance record for this ``to_ts`` call.
 
@@ -55,18 +55,18 @@ def to_ts(tsd, record_provenance=True):
     -------
     tskit.TreeSequence
     """
-    if tsd.num_contigs == 0:
-        raise ValueError("Cannot convert an empty archive to a tree sequence")
+    if tsg.num_contigs == 0:
+        raise ValueError("Cannot convert an empty group to a tree sequence")
 
-    sorted_keys = tsd.contigs  # sorted by index
+    sorted_keys = tsg.contigs  # sorted by index
 
     # ------------------------------------------------------------------
     # 1. Validate that site and mutation schemas are identical
     # ------------------------------------------------------------------
-    ref_site_schema = tsd[sorted_keys[0]].tables.sites.metadata_schema
-    ref_mut_schema = tsd[sorted_keys[0]].tables.mutations.metadata_schema
+    ref_site_schema = tsg[sorted_keys[0]].tables.sites.metadata_schema
+    ref_mut_schema = tsg[sorted_keys[0]].tables.mutations.metadata_schema
     for key in sorted_keys[1:]:
-        ts = tsd[key]
+        ts = tsg[key]
         if ts.tables.sites.metadata_schema != ref_site_schema:
             raise ValueError(
                 f"Site metadata schemas differ between contigs: cannot merge. "
@@ -84,7 +84,7 @@ def to_ts(tsd, record_provenance=True):
     #    vacant_bitflags: bit i set if the contig with metadata 'index' i is absent
     # ------------------------------------------------------------------
     # Node IDs with IS_SHARED set in at least one contig.
-    shared_node_ids = tsd.shared_node_ids
+    shared_node_ids = tsg.shared_node_ids
 
     # For each shared node ID, build vacant_bitflags and find first non-vacant contig
     shared_node_array = []  # list of (node_id, first_contig_key, vacant_bitflags)
@@ -93,7 +93,7 @@ def to_ts(tsd, record_provenance=True):
         vacant_bitflags = 0
         first_key = None
         for key in sorted_keys:
-            ts = tsd[key]
+            ts = tsg[key]
             if nid < ts.num_nodes and (ts.tables.nodes[nid].flags & NODE_IS_SHARED):
                 if first_key is None:
                     first_key = key
@@ -107,8 +107,8 @@ def to_ts(tsd, record_provenance=True):
     # ------------------------------------------------------------------
     # 3. Build new TableCollection
     # ------------------------------------------------------------------
-    ref_ts = tsd[sorted_keys[0]]
-    new_tc = tskit.TableCollection(sequence_length=tsd.total_sequence_length)
+    ref_ts = tsg[sorted_keys[0]]
+    new_tc = tskit.TableCollection(sequence_length=tsg.total_sequence_length)
 
     # Copy individual, population tables from reference
     new_tc.individuals.replace_with(ref_ts.tables.individuals)
@@ -127,7 +127,7 @@ def to_ts(tsd, record_provenance=True):
     # ------------------------------------------------------------------
     contigs_meta = []
     for key in sorted_keys:
-        ts = tsd[key]
+        ts = tsg[key]
         entry = {
             "sequence_length": ts.sequence_length,
             "num_nodes": ts.num_nodes,
@@ -166,7 +166,7 @@ def to_ts(tsd, record_provenance=True):
     all_node_maps = []
 
     for contig_idx, key in enumerate(sorted_keys):
-        ts = tsd[key]
+        ts = tsg[key]
         node_map = np.full(ts.num_nodes, tskit.NULL, dtype=np.int64)
 
         # Add nodes from this contig, inserting shared nodes at correct positions
@@ -181,7 +181,7 @@ def to_ts(tsd, record_provenance=True):
                     shared_node_counter
                 ]
                 # Append node from the first non-vacant contig
-                src_ts = tsd[first_key]
+                src_ts = tsg[first_key]
                 src_row = src_ts.tables.nodes[shared_nid]
 
                 # Optionally store vacant_bitflags in metadata
@@ -290,7 +290,7 @@ def to_ts(tsd, record_provenance=True):
             new_tc.nodes.append(
                 tskit.NodeTableRow(flags=0, time=0.0, population=tskit.NULL, individual=tskit.NULL)
             )
-        src_ts = tsd[first_key]
+        src_ts = tsg[first_key]
         src_row = src_ts.tables.nodes[shared_nid]
         node_meta = _try_add_vacant_flags(
             src_row.metadata,
@@ -314,8 +314,8 @@ def to_ts(tsd, record_provenance=True):
 
 def from_ts(ts, record_provenance=True):
     """
-    Convert a single merged :class:`tskit.TreeSequence` back into a
-    :class:`TreeSequenceGroup`.
+    Unsmush a single merged :class:`tskit.TreeSequence` back into a
+    separate group of linked tree sequences stored in a :class:`TreeSequenceGroup`.
 
     The input tree sequence must have been created by :func:`to_ts`
     (or equivalent), with top-level metadata containing a
@@ -568,7 +568,7 @@ def from_tree_sequences(
 
     Examples
     --------
-    >>> tsd = from_tree_sequences(
+    >>> tsg = from_tree_sequences(
     ...     [ts20, ts21],
     ...     ids=[20, 21],
     ...     symbols=["20", "21"],
@@ -577,7 +577,7 @@ def from_tree_sequences(
 
     Mark all sample nodes as shared:
 
-    >>> tsd = from_tree_sequences(
+    >>> tsg = from_tree_sequences(
     ...     [ts20, ts21],
     ...     ids=[20, 21],
     ...     symbols=["20", "21"],

@@ -33,7 +33,7 @@ ts21 = engine.simulate(model, chr21, samples)
 ts22 = engine.simulate(model, chr22, samples)
 first_8_haplosomes = ts20.samples()[0:8]
 
-# Combine into a multi-chromosome assemblage
+# Combine into a multi-chromosome group
 # shared_nodes can be a list of sample nodes to mark as shared across chromosomes,
 # (required for cross-chromosome statistics) or "samples" to mark all samples as such
 tsg = tsgroup.from_tree_sequences(

@@ -4,7 +4,7 @@ A Python library for efficiently storing and analysing multiple chromosomes
 (contigs) using [tskit](https://tskit.dev).
 
 The central object is {class}`~tsgroup.TreeSequenceGroup`
-(abbreviated `tsd`), which holds a collection of
+(abbreviated `tsg`), which holds a collection of
 {class}`tskit.TreeSequence` objects — one per contig — in a dictionary keyed
 by {class}`~tsgroup.ContigKey` named-tuples.  It provides:
 
